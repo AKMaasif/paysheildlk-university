@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: payshield
+      POSTGRES_PASSWORD: payshield
+      POSTGRES_DB: payshield
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payshield -d payshield"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://payshield:payshield@postgres:5432/payshield
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-payshield-pilot}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      META_API_KEY: ${META_API_KEY:-}
+      META_BASE_URL: ${META_BASE_URL:-https://api.meta.ai/v1}
+      META_MODEL: ${META_MODEL:-muse-ember-1.0}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      TEXTLK_API_KEY: ${TEXTLK_API_KEY:-}
+      TEXTLK_API_URL: ${TEXTLK_API_URL:-https://app.text.lk/api/v3/sms/send}
+      SMS_SENDER_ID: ${SMS_SENDER_ID:-PayShield}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-alerts@payshield.lk}
+      REALERT_SECONDS: ${REALERT_SECONDS:-180}
+      ESCALATE_SECONDS: ${ESCALATE_SECONDS:-600}
+      STEP_DELAY_MS: ${STEP_DELAY_MS:-400}
+      DEMO_ASSIST: ${DEMO_ASSIST:-true}
+      TELCO_BASE_URL: ${TELCO_BASE_URL:-}
+      TELCO_TOKEN: ${TELCO_TOKEN:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_PROXY_URL: http://backend:8000
+      NEXT_PUBLIC_WS_PORT: "8000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
