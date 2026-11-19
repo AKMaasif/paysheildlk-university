@@ -1,3 +1,4 @@
+import base64
 import secrets
 from datetime import timedelta
 
@@ -203,13 +204,91 @@ def customer_liveness(case_id: str, body: dict, authorization: str | None = Head
     frames = []
     for item in body.get("frames") or []:
         try:
-            frames.append(base64.b64decode(item))
+            frames.append(base64.b64decode(item, validate=True))
         except Exception:
-            frames.append(str(item).encode())
-    # Only the camera frames go to the check. A client-supplied verdict is never forwarded.
-    ok = resume_case(case_id, {"frames": frames}, "waiting_liveness")
+            raise HTTPException(status_code=422, detail="A camera frame could not be read. Please scan again.")
+    offsets = [int(x) for x in (body.get("offsets_ms") or []) if isinstance(x, (int, float))]
+    # Only the camera frames, their times and the signed challenge go to the check. A client-supplied verdict is never forwarded.
+    ok = resume_case(case_id, {"frames": frames, "offsets_ms": offsets, "challenge": str(body.get("challenge") or "")}, "waiting_liveness")
     if not ok:
         raise HTTPException(status_code=409, detail="This payment is not waiting for a selfie")
     from app.api import _customer_case_state
 
     return _customer_case_state(case_id, user.id)
+
+
+# ---------------------------------------------------------------- calibration (the feedback loop with a human gate)
+
+class DecideIn(BaseModel):
+    decision: str
+    note: str = ""
+
+
+def _approver(authorization: str | None) -> User:
+    from app.api import current_user
+
+    user = current_user(authorization)
+    if user.role not in {"fraud_analyst", "super_admin"}:
+        raise HTTPException(status_code=403, detail="Only a fraud analyst or the super admin can approve a rule change")
+    return user
+
+
+@router.get("/api/calibration")
+def calibration_view(authorization: str | None = Header(default=None)):
+    from app import calibration
+    from app.api import current_user
+    from app.models import PolicyProposal
+    from app.risk import DEFAULTS, SAFE_RANGE, thresholds
+
+    user = current_user(authorization)
+    if user.role == "customer":
+        raise HTTPException(status_code=403, detail="Operator sign-in required")
+    with session_scope() as session:
+        rows = session.query(PolicyProposal).order_by(PolicyProposal.created_at.desc()).limit(30).all()
+        return {
+            "thresholds": {k: {"value": v, "default": DEFAULTS[k], "min": SAFE_RANGE[k][0], "max": SAFE_RANGE[k][1]} for k, v in thresholds().items()},
+            "evidence": calibration.evidence(session),
+            "min_cases": calibration.MIN_CASES,
+            "proposals": [calibration.proposal_dict(r) for r in rows],
+            "can_approve": user.role in {"fraud_analyst", "super_admin"},
+        }
+
+
+@router.post("/api/calibration/propose")
+def calibration_propose(authorization: str | None = Header(default=None)):
+    from app import calibration
+
+    actor = _writer(authorization)
+    with session_scope() as session:
+        made = calibration.propose(session)
+    audit(actor.email, "calibration_propose", "hold_score", f"{len(made)} proposal(s)")
+    return {"proposals": made}
+
+
+@router.post("/api/calibration/proposals/{proposal_id}/decide")
+def calibration_decide(proposal_id: str, body: DecideIn, authorization: str | None = Header(default=None)):
+    from app import calibration
+
+    actor = _approver(authorization)
+    if body.decision not in {"approve", "reject"}:
+        raise HTTPException(status_code=400, detail="Choose approve or reject")
+    try:
+        with session_scope() as session:
+            result = calibration.decide(session, proposal_id, body.decision == "approve", actor.email, body.note)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    audit(actor.email, "calibration_" + body.decision, proposal_id, f"{result['key']} {result['current']} -> {result['proposed']}")
+    return result
+
+
+@router.post("/api/calibration/reset")
+def calibration_reset(authorization: str | None = Header(default=None)):
+    from app import calibration
+
+    actor = _approver(authorization)
+    with session_scope() as session:
+        calibration.reset(session, actor.email)
+    audit(actor.email, "calibration_reset", "hold_score", "back to the default")
+    return {"ok": True}
