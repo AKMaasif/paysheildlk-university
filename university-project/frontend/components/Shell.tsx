@@ -97,6 +97,7 @@ const SECTIONS: { label: string; items: { href: string; label: string; icon: str
     items: [
       { href: "/agents", label: "Agents & models", icon: "model", roles: ROLES },
       { href: "/simulate", label: "Simulate", icon: "demo", roles: ROLES },
+      { href: "/calibration", label: "Calibration", icon: "report", roles: ROLES },
       { href: "/enrol", label: "Add customer", icon: "cases", roles: ["fraud_analyst", "super_admin", "bank_supervisor"] },
       { href: "/security", label: "Security", icon: "settings", roles: ROLES },
       { href: "/admin", label: "Administration", icon: "admin", roles: ["super_admin"] },
@@ -118,6 +119,7 @@ const TITLES: Record<string, string> = {
   "/settings": "Settings",
   "/demo": "Demo controls",
   "/simulate": "Simulate",
+  "/calibration": "Rule calibration",
   "/analytics": "Fraud analytics",
   "/enrol": "Add customer",
   "/security": "Security",
