@@ -241,7 +241,7 @@ def test_the_manual_block_switch_blocks_notifies_audits_and_files_a_receipt(boot
     assert "Payment blocked" in titles and any("receipt" in title.lower() for title in titles)
     assert any(event[0] == "analyst" and "manual block switch" in event[5] for event in _events(case_id))
     tools_seen = [event[2] for event in _events(case_id) if event[0] == "case"]
-    assert tools_seen == ["generate_report", "deliver_report"]
+    assert tools_seen == ["review_notes", "generate_report", "deliver_report"]
     from app.models import AuditLog
 
     with session_scope() as session:
