@@ -1,3 +1,4 @@
+import secrets
 from datetime import timedelta
 
 from app.models import (
@@ -22,9 +23,8 @@ CUSTOMERS = [
         "id": "cus_nimal",
         "name": "Nimal Perera",
         "email": "nimal.perera@mail.lk",
-        "password": "pilot-nimal",
         "phone": "+94772451183",
-        "bank": "Commercial Bank",
+        "bank": "BankCylone",
         "province": "Western",
         "district": "Colombo",
         "branch": "Kollupitiya",
@@ -39,9 +39,8 @@ CUSTOMERS = [
         "id": "cus_kumari",
         "name": "Kumari Silva",
         "email": "kumari.silva@mail.lk",
-        "password": "pilot-kumari",
         "phone": "+94718832201",
-        "bank": "HNB",
+        "bank": "BankCylone",
         "province": "Central",
         "district": "Kandy",
         "branch": "Kandy City",
@@ -56,9 +55,8 @@ CUSTOMERS = [
         "id": "cus_fathima",
         "name": "Fathima Nazik",
         "email": "fathima.nazik@mail.lk",
-        "password": "pilot-fathima",
         "phone": "+94754409182",
-        "bank": "Sampath Bank",
+        "bank": "BankCylone",
         "province": "Eastern",
         "district": "Batticaloa",
         "branch": "Batticaloa",
@@ -73,9 +71,8 @@ CUSTOMERS = [
         "id": "cus_ravi",
         "name": "Ravi Fernando",
         "email": "ravi.fernando@mail.lk",
-        "password": "pilot-ravi",
         "phone": "+94763017740",
-        "bank": "Bank of Ceylon",
+        "bank": "BankCylone",
         "province": "Southern",
         "district": "Galle",
         "branch": "Galle Fort",
@@ -90,9 +87,8 @@ CUSTOMERS = [
         "id": "cus_anjali",
         "name": "Anjali Rajapaksa",
         "email": "anjali.rajapaksa@mail.lk",
-        "password": "pilot-anjali",
         "phone": "+94779124408",
-        "bank": "People's Bank",
+        "bank": "BankCylone",
         "province": "Northern",
         "district": "Jaffna",
         "branch": "Jaffna",
@@ -107,9 +103,8 @@ CUSTOMERS = [
         "id": "cus_irfan",
         "name": "Mohamed Irfan",
         "email": "mohamed.irfan@mail.lk",
-        "password": "pilot-irfan",
         "phone": "+94702286533",
-        "bank": "Commercial Bank",
+        "bank": "BankCylone",
         "province": "North Western",
         "district": "Kurunegala",
         "branch": "Kurunegala",
@@ -124,9 +119,8 @@ CUSTOMERS = [
         "id": "cus_dilani",
         "name": "Dilani Wijesinghe",
         "email": "dilani.wijesinghe@mail.lk",
-        "password": "pilot-dilani",
         "phone": "+94746153904",
-        "bank": "NSB",
+        "bank": "BankCylone",
         "province": "Uva",
         "district": "Badulla",
         "branch": "Badulla",
@@ -141,9 +135,8 @@ CUSTOMERS = [
         "id": "cus_suresh",
         "name": "Suresh Nadarajah",
         "email": "suresh.nadarajah@mail.lk",
-        "password": "pilot-suresh",
         "phone": "+94771046621",
-        "bank": "HNB",
+        "bank": "BankCylone",
         "province": "Northern",
         "district": "Jaffna",
         "branch": "Jaffna",
@@ -158,9 +151,8 @@ CUSTOMERS = [
         "id": "cus_harshani",
         "name": "Harshani Peiris",
         "email": "harshani.peiris@mail.lk",
-        "password": "pilot-harshani",
         "phone": "+94761239880",
-        "bank": "Sampath Bank",
+        "bank": "BankCylone",
         "province": "Western",
         "district": "Gampaha",
         "branch": "Gampaha",
@@ -175,9 +167,8 @@ CUSTOMERS = [
         "id": "cus_lasantha",
         "name": "Lasantha Abeysekera",
         "email": "lasantha.abeysekera@mail.lk",
-        "password": "pilot-lasantha",
         "phone": "+94713345092",
-        "bank": "Bank of Ceylon",
+        "bank": "BankCylone",
         "province": "Southern",
         "district": "Matara",
         "branch": "Matara",
@@ -190,10 +181,26 @@ CUSTOMERS = [
     },
 ]
 
+# Bank-side record for each fictional customer: NIC and the balance on the account.
+RECORD = {
+    "cus_nimal": ("198524701234", 1_245_800),
+    "cus_kumari": ("927341820V", 684_250),
+    "cus_fathima": ("199063412087", 392_400),
+    "cus_ravi": ("881204563V", 2_104_900),
+    "cus_anjali": ("199472910356", 915_300),
+    "cus_irfan": ("198118390572", 3_480_000),
+    "cus_dilani": ("200012845519", 276_100),
+    "cus_suresh": ("790563217V", 1_052_650),
+    "cus_harshani": ("199337105268", 548_700),
+    "cus_lasantha": ("841906734V", 1_876_320),
+}
+for _row in CUSTOMERS:
+    _row["nic"], _row["balance"] = RECORD[_row["id"]]
+
 OPERATORS = [
     ("usr_analyst", "Ishara Gunawardena", "analyst@payshield.lk", "pilot-analyst", "fraud_analyst", None),
     ("usr_telco", "Nuwan Jayasekara", "telco@payshield.lk", "pilot-telco", "telecom_operator", None),
-    ("usr_supervisor", "Malini Fernando", "supervisor@payshield.lk", "pilot-supervisor", "bank_supervisor", "Commercial Bank"),
+    ("usr_supervisor", "Malini Fernando", "supervisor@payshield.lk", "pilot-supervisor", "bank_supervisor", "BankCylone"),
     ("usr_auditor", "Chathura Bandara", "auditor@payshield.lk", "pilot-auditor", "auditor", None),
     ("usr_admin", "Sanduni de Silva", "admin@payshield.lk", "pilot-admin", "super_admin", None),
 ]
@@ -236,8 +243,11 @@ def seed(session, settings) -> bool:
             id=row["id"],
             email=row["email"],
             full_name=row["name"],
-            password_hash=hash_password(row["password"]),
+            password_hash=hash_password(secrets.token_urlsafe(24)),
             role="customer",
+            nic=row["nic"],
+            balance_lkr=row["balance"],
+            registered=False,
             phone=row["phone"],
             bank=row["bank"],
             province=row["province"],
@@ -304,7 +314,7 @@ def seed(session, settings) -> bool:
             email="priya.fernando@mail.lk",
             full_name="Priya Fernando",
             role="fraud_analyst",
-            bank="Commercial Bank",
+            bank="BankCylone",
             used=False,
         )
     )
@@ -313,7 +323,7 @@ def seed(session, settings) -> bool:
             id="acr_pending",
             name="Shani Perera",
             email="shani.perera@combank.example",
-            organisation="Commercial Bank",
+            organisation="BankCylone",
             role_asked="fraud_analyst",
             scope_asked="Western province",
             reason="Cover the Colombo high-value queue during the pilot.",
@@ -363,7 +373,7 @@ def seed(session, settings) -> bool:
             kind="transfer",
             amount_lkr=amount,
             payee=payee,
-            payee_bank="Sampath Bank" if new_payee else user.bank,
+            payee_bank="BankCylone" if new_payee else user.bank,
             new_payee=new_payee,
             status=tx_status,
             occurred_at=when,
@@ -555,3 +565,23 @@ def _audits(session, now) -> None:
                 created_at=now - timedelta(hours=hours),
             )
         )
+
+
+OLD_BANK_NAMES = ["Commercial Bank", "HNB", "Sampath Bank", "Bank of Ceylon", "People's Bank", "NSB"]
+
+
+def upgrade_existing(session) -> bool:
+    """Bring a database made by an older build up to date: one bank name and the new customer record fields."""
+    changed = False
+    for model, column in ((User, "bank"), (Case, "bank"), (Transaction, "payee_bank"), (Invitation, "bank"), (AccessRequest, "organisation")):
+        field = getattr(model, column)
+        if session.query(model).filter(field.in_(OLD_BANK_NAMES)).update({column: "BankCylone"}, synchronize_session=False):
+            changed = True
+    for row in CUSTOMERS:
+        user = session.get(User, row["id"])
+        if user is not None and user.nic is None:
+            user.nic = row["nic"]
+            user.balance_lkr = row["balance"]
+            user.registered = False
+            changed = True
+    return changed
