@@ -65,8 +65,16 @@ def release_transaction(transaction_id: str, case_id: str, reason: str) -> dict:
         detail = dict(tx.detail or {})
         detail["release_reason"] = reason
         tx.detail = detail
+        first_release = tx.status != "released"
         tx.status = "released"
         tx.case_id = case_id
+        if first_release and tx.kind == "transfer":
+            # The money leaves the account only when the payment is released, and only once.
+            from app.models import User
+
+            owner = session.get(User, tx.customer_id)
+            if owner is not None:
+                owner.balance_lkr = max(0, int(owner.balance_lkr or 0) - int(tx.amount_lkr or 0))
         return {"transaction_id": tx.id, "status": "released", "changed": True, "amount_lkr": tx.amount_lkr}
 
 
