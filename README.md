@@ -39,7 +39,7 @@ After a customer says the payment was theirs, the desk asks for a live camera se
 | --- | --- |
 | `POST /sim-swap/v1/check` and `/retrieve-date` | Same request and response shape as the GSMA CAMARA SIM Swap API. Swap `TELCO_BASE_URL` later for a real operator. |
 | Telecom and banking agents | Call tools, then ask the model for two sentences. |
-| Policy | `decide_policy` in `backend/app/risk.py`. No model call. |
+| Policy | `decide_policy` in `project/app/risk.py`. No model call. |
 | Alert | Web push when Firebase is configured, plus email, plus a generic SMS with no link and no code. The customer app also updates over WebSocket, which is what the demo uses. |
 | Customer app | Email, password, authenticator TOTP. No SMS one-time code. |
 | Case report | Markdown and PDF for a fraud desk, with CBSL and TRCSL context marked as a demonstration note. |
@@ -64,24 +64,24 @@ Postgres is the app database and the LangGraph checkpointer inside Compose. If t
 ### Without Docker
 
 ```bash
-cd backend
+cd project
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+python main.py
 ```
 
 ```bash
-cd frontend
+cd project/frontend
 npm install
 npm run dev
 ```
 
-That backend uses SQLite under `backend/data/` and the in-memory event bus.
+That backend uses SQLite under `project/data/` and the in-memory event bus.
 
 Tests:
 
 ```bash
-cd backend
+cd project
 pytest
 ```
 
@@ -117,19 +117,19 @@ Customer passwords are `pilot-` plus the first name (`pilot-nimal`, `pilot-dilan
 
 No answer for 3 minutes sends the push, the email, and the same generic SMS again. No answer for 10 minutes resumes the graph as a timeout, assigns the case to a person, and leaves the money held. Saying yes starts a fresh 10-minute window for the security answers.
 
-SMS text never contains a URL or a 4 to 8 digit code. The check lives in `backend/app/notify.py` and runs for every driver, including Text.lk.
+SMS text never contains a URL or a 4 to 8 digit code. The check lives in `project/app/notify.py` and runs for every driver, including Text.lk.
 
 Push is device-bound. The customer app registers the browser after TOTP. Firebase is used when `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` are set. Otherwise the open page updates over WebSocket, including on an iPhone that has not installed the Home Screen app.
 
 ## Layout
 
 ```
-backend/app/agents/graph.py    supervisor graph
-backend/app/risk.py            score and the hold / block / release rules
-backend/app/facts.py           CAMARA-shaped SIM swap reads
-backend/app/llm.py             Gemini, Meta, mock
-frontend/app/(console)         operator desk
-frontend/app/c                 customer app
+project/app/agents/graph.py    supervisor graph
+project/app/risk.py            score and the hold / block / release rules
+project/app/facts.py           CAMARA-shaped SIM swap reads
+project/app/llm.py             Gemini, Meta, mock
+project/frontend/app/(console)         operator desk
+project/frontend/app/c                 customer app
 ```
 
 The operator desk is a desktop layout: menu, a short ribbon, the case pages, and a details pane that opens on the selected row. The customer app is a narrow layout meant for a phone. A bank supervisor only sees their own bank; that limit is enforced on the server.
