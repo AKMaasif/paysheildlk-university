@@ -99,7 +99,7 @@ def _open_port(event: SimEvent | None, now) -> bool:
     return True
 
 
-def collect_signals(customer_id: str, transaction_id: str) -> tuple[Signals, dict]:
+def collect_signals(customer_id: str, transaction_id: str, use_profile: bool | None = None) -> tuple[Signals, dict]:
     now = utcnow()
     with session_scope() as session:
         user = session.get(User, customer_id)
@@ -131,6 +131,16 @@ def collect_signals(customer_id: str, transaction_id: str) -> tuple[Signals, dic
         )
         new_device = any((item.detail or {}).get("new_device") for item in logins)
         swap_age = age_hours(swap.occurred_at, now) if swap else None
+        if use_profile is None:
+            from app.runtime import runtime
+
+            use_profile = bool(runtime.settings is None or runtime.settings.customer_profile)
+        learned = {"familiar_payment": False, "unusual_amount": False}
+        if use_profile:
+            from app.profile import build_profile, judge
+
+            profile = build_profile(session, customer_id, now, exclude_transaction_id=transaction_id)
+            learned = judge(profile, tx.payee, tx.amount_lkr or 0, bool(tx.new_payee), swap_age is not None and swap_age <= 240, now)
         signals = Signals(
             sim_swap_age_hours=swap_age,
             new_imei_age_hours=age_hours(imei.occurred_at, now) if imei else None,
@@ -143,6 +153,8 @@ def collect_signals(customer_id: str, transaction_id: str) -> tuple[Signals, dic
             new_device_login=new_device,
             latest_sim_change=iso(swap.occurred_at) if swap else None,
             swapped=swap_age is not None and swap_age <= 240,
+            familiar_payment=learned["familiar_payment"],
+            unusual_amount=learned["unusual_amount"],
         )
         context = {
             "customer": user.full_name,
