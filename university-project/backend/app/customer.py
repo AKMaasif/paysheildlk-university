@@ -106,7 +106,23 @@ class RegisterIn(BaseModel):
     account_number: str = Field(min_length=6, max_length=32)
     password: str = Field(min_length=1, max_length=200)
     confirm_password: str = Field(min_length=1, max_length=200)
-    frames: list[str] = Field(default_factory=list, max_length=4)
+    frames: list[str] = Field(default_factory=list, max_length=20)
+    offsets_ms: list[int] = Field(default_factory=list, max_length=20)
+    challenge: str = Field(default="", max_length=1000)
+
+
+@router.get("/api/customer/register/challenge")
+def register_challenge(request: Request):
+    """The random instructions for the face scan. Signed, short-lived and usable once."""
+    from app import face
+
+    ratelimit.take("register_ip", _client_ip(request))
+    mode = face.mode()
+    if mode == "unavailable":
+        raise HTTPException(status_code=503, detail="Face scanning is not available right now. Please try again later.")
+    if mode == "legacy":
+        return {"mode": "legacy", "steps": [], "instructions": [], "token": ""}
+    return {"mode": "dlib", **face.issue_challenge("register")}
 
 
 @router.post("/api/customer/register")
@@ -142,16 +158,32 @@ def register(body: RegisterIn, request: Request):
         raise HTTPException(status_code=422, detail=problem)
 
     # The face scan is decided here, from the camera frames. The browser cannot claim a pass.
+    from app import face
+
     ratelimit.take("liveness", "register:" + user_id)
-    frames: list[bytes] = []
-    for item in body.frames:
+    mode = face.mode()
+    if mode == "unavailable":
+        raise HTTPException(status_code=503, detail="Face scanning is not available right now. Please try again later.")
+    if mode == "legacy":
+        frames: list[bytes] = []
+        for item in body.frames:
+            try:
+                frames.append(base64.b64decode(item, validate=False))
+            except Exception:
+                frames.append(b"")
+        verdict = analyse(frames)
+        if verdict["verdict"] != "live":
+            raise HTTPException(status_code=422, detail="The face scan did not pass. Face the camera in good light and try again.")
+        sealed = encrypt(base64.b64encode(frames[0]).decode(), runtime.settings.encryption_key)
+        face_hash = verdict["image_sha256"]
+    else:
         try:
-            frames.append(base64.b64decode(item, validate=False))
-        except Exception:
-            frames.append(b"")
-    verdict = analyse(frames)
-    if verdict["verdict"] != "live":
-        raise HTTPException(status_code=422, detail="The face scan did not pass. Face the camera in good light and try again.")
+            enrolled = face.enroll(body.frames, body.offsets_ms, body.challenge)
+        except (face.ChallengeError, face.BadCapture) as exc:
+            raise HTTPException(status_code=422, detail=f"The face scan was not accepted. {exc}")
+        if not enrolled["ok"]:
+            raise HTTPException(status_code=422, detail="The face scan was not accepted. " + " ".join(enrolled["hints"][:3]))
+        sealed, face_hash = enrolled["sealed"], enrolled["hash"]
 
     username = clean_name(display_name)
     with session_scope() as session:
@@ -168,9 +200,9 @@ def register(body: RegisterIn, request: Request):
         user.password_changed_at = utcnow()
         user.must_change_password = False
         user.status = "active"
-        user.face_hash = verdict["image_sha256"]
-        # The reference frame is kept encrypted. It is never shown back and never sent to a model.
-        user.face_ref = encrypt(base64.b64encode(frames[0]).decode(), runtime.settings.encryption_key)
+        user.face_hash = face_hash
+        # The reference images and face templates are kept encrypted. They are never shown back and never sent to a model.
+        user.face_ref = sealed
         session.add(
             Device(
                 id="dev_" + hashlib.sha1((user_id + str(utcnow())).encode()).hexdigest()[:10],
