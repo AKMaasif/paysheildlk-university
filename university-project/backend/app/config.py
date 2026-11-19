@@ -43,6 +43,10 @@ class Settings:
     escalate_seconds: int
     step_delay_ms: int
     demo_assist: bool
+    customer_profile: bool
+    mcp_tools: bool
+    face_engine: str
+    face_challenge: bool
     telco_base_url: str
     telco_token: str
     checkpoint_path: str
@@ -79,6 +83,10 @@ class Settings:
             escalate_seconds=_int("ESCALATE_SECONDS", 600),
             step_delay_ms=_int("STEP_DELAY_MS", 400),
             demo_assist=_flag("DEMO_ASSIST", "true"),
+            customer_profile=_flag("CUSTOMER_PROFILE", "true"),
+            mcp_tools=_flag("MCP_TOOLS", "false"),
+            face_engine=_get("FACE_ENGINE", "dlib").lower(),
+            face_challenge=_flag("FACE_CHALLENGE", "true"),
             telco_base_url=_get("TELCO_BASE_URL").rstrip("/"),
             telco_token=_get("TELCO_TOKEN"),
             checkpoint_path=_get("CHECKPOINT_PATH", "./data/checkpoints.sqlite"),
