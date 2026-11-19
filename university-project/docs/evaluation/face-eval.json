@@ -1,0 +1,345 @@
+{
+  "people": 4,
+  "photos": 10,
+  "genuine_pairs": 21,
+  "impostor_pairs": 24,
+  "genuine": {
+    "min": 0.049,
+    "max": 0.387
+  },
+  "impostor": {
+    "min": 0.694,
+    "max": 0.895
+  },
+  "at_thresholds": {
+    "match (score 80)": {
+      "threshold_distance": 0.491,
+      "score": 80.0,
+      "false_reject_rate": 0.0,
+      "false_accept_rate": 0.0
+    },
+    "likely (score 60)": {
+      "threshold_distance": 0.54,
+      "score": 60.0,
+      "false_reject_rate": 0.0,
+      "false_accept_rate": 0.0
+    },
+    "uncertain (score 30)": {
+      "threshold_distance": 0.602,
+      "score": 30.0,
+      "false_reject_rate": 0.0,
+      "false_accept_rate": 0.0
+    }
+  },
+  "equal_error_rate": {
+    "threshold_distance": 0.387,
+    "rate": 0.0
+  },
+  "changes": [
+    {
+      "person": "alex",
+      "change": "darker (x0.55)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.126
+    },
+    {
+      "person": "alex",
+      "change": "brighter (x1.5)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.161
+    },
+    {
+      "person": "alex",
+      "change": "lower contrast",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.123
+    },
+    {
+      "person": "alex",
+      "change": "blur (radius 1.5)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.147
+    },
+    {
+      "person": "alex",
+      "change": "noise (sd 16)",
+      "outcome": "match",
+      "score": 99.9,
+      "distance": 0.217
+    },
+    {
+      "person": "alex",
+      "change": "grayscale",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.139
+    },
+    {
+      "person": "alex",
+      "change": "rotated 10 degrees",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.09
+    },
+    {
+      "person": "alex",
+      "change": "heavy compression",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.176
+    },
+    {
+      "person": "alex",
+      "change": "cap brim drawn on",
+      "outcome": "match",
+      "score": 97.4,
+      "distance": 0.378
+    },
+    {
+      "person": "alex",
+      "change": "lower face covered (stand-in for beard or mask)",
+      "outcome": "match",
+      "score": 99.7,
+      "distance": 0.276
+    },
+    {
+      "person": "alex",
+      "change": "band over the eyes",
+      "outcome": "no face found",
+      "score": null
+    },
+    {
+      "person": "biden",
+      "change": "darker (x0.55)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.078
+    },
+    {
+      "person": "biden",
+      "change": "brighter (x1.5)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.094
+    },
+    {
+      "person": "biden",
+      "change": "lower contrast",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.083
+    },
+    {
+      "person": "biden",
+      "change": "blur (radius 1.5)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.06
+    },
+    {
+      "person": "biden",
+      "change": "noise (sd 16)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.091
+    },
+    {
+      "person": "biden",
+      "change": "grayscale",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.175
+    },
+    {
+      "person": "biden",
+      "change": "rotated 10 degrees",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.053
+    },
+    {
+      "person": "biden",
+      "change": "heavy compression",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.116
+    },
+    {
+      "person": "biden",
+      "change": "cap brim drawn on",
+      "outcome": "match",
+      "score": 99.7,
+      "distance": 0.263
+    },
+    {
+      "person": "biden",
+      "change": "lower face covered (stand-in for beard or mask)",
+      "outcome": "match",
+      "score": 99.2,
+      "distance": 0.322
+    },
+    {
+      "person": "biden",
+      "change": "band over the eyes",
+      "outcome": "no face found",
+      "score": null
+    },
+    {
+      "person": "lin",
+      "change": "darker (x0.55)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.121
+    },
+    {
+      "person": "lin",
+      "change": "brighter (x1.5)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.122
+    },
+    {
+      "person": "lin",
+      "change": "lower contrast",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.134
+    },
+    {
+      "person": "lin",
+      "change": "blur (radius 1.5)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.049
+    },
+    {
+      "person": "lin",
+      "change": "noise (sd 16)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.107
+    },
+    {
+      "person": "lin",
+      "change": "grayscale",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.17
+    },
+    {
+      "person": "lin",
+      "change": "rotated 10 degrees",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.025
+    },
+    {
+      "person": "lin",
+      "change": "heavy compression",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.134
+    },
+    {
+      "person": "lin",
+      "change": "cap brim drawn on",
+      "outcome": "match",
+      "score": 99.9,
+      "distance": 0.227
+    },
+    {
+      "person": "lin",
+      "change": "lower face covered (stand-in for beard or mask)",
+      "outcome": "match",
+      "score": 98.5,
+      "distance": 0.352
+    },
+    {
+      "person": "lin",
+      "change": "band over the eyes",
+      "outcome": "match",
+      "score": 98.7,
+      "distance": 0.344
+    },
+    {
+      "person": "obama",
+      "change": "darker (x0.55)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.111
+    },
+    {
+      "person": "obama",
+      "change": "brighter (x1.5)",
+      "outcome": "match",
+      "score": 99.9,
+      "distance": 0.2
+    },
+    {
+      "person": "obama",
+      "change": "lower contrast",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.118
+    },
+    {
+      "person": "obama",
+      "change": "blur (radius 1.5)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.104
+    },
+    {
+      "person": "obama",
+      "change": "noise (sd 16)",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.089
+    },
+    {
+      "person": "obama",
+      "change": "grayscale",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.179
+    },
+    {
+      "person": "obama",
+      "change": "rotated 10 degrees",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.053
+    },
+    {
+      "person": "obama",
+      "change": "heavy compression",
+      "outcome": "match",
+      "score": 100.0,
+      "distance": 0.108
+    },
+    {
+      "person": "obama",
+      "change": "cap brim drawn on",
+      "outcome": "match",
+      "score": 99.7,
+      "distance": 0.271
+    },
+    {
+      "person": "obama",
+      "change": "lower face covered (stand-in for beard or mask)",
+      "outcome": "match",
+      "score": 99.2,
+      "distance": 0.318
+    },
+    {
+      "person": "obama",
+      "change": "band over the eyes",
+      "outcome": "no face found",
+      "score": null
+    }
+  ]
+}
