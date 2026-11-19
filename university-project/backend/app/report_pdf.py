@@ -416,6 +416,7 @@ def build_case_pdf(case_id: str, audience: str = "analyst") -> bytes:
                 ("Risk score", f"{case.risk_score if case.risk_score is not None else '-'} / 100"),
                 ("Rule decision", case.policy_decision or "-"),
                 ("Customer answer", case.customer_decision or "none"),
+                ("Face check", f"{case.face_score:g} / 100 ({case.face_verdict})" if case.face_score is not None else (case.face_verdict or "not used")),
                 ("SIM freeze", case.sim_freeze_ref or "not requested"),
                 ("Time to outcome", f"{int((decided_at - started).total_seconds())} s" if decided_at else "-"),
                 ("Alerts sent", str(case.alert_count or 0)),
@@ -430,7 +431,7 @@ def build_case_pdf(case_id: str, audience: str = "analyst") -> bytes:
         for index, step in enumerate(_customer_steps(case, bool(user and user.restricted)), start=1):
             doc.para(f"{index}.  {step}")
         doc.heading("Why the payment was checked")
-        reasons = [str(item.get("label")) for item in (case.risk_factors or [])][:5]
+        reasons = [str(item.get("label")) for item in (case.risk_factors or []) if (item.get("points") or 0) > 0][:5]
         # Lower-case the first letter, but leave acronyms such as SIM alone.
         reasons = [reason if reason[1:2].isupper() else reason[:1].lower() + reason[1:] for reason in reasons]
         doc.para(
@@ -441,9 +442,13 @@ def build_case_pdf(case_id: str, audience: str = "analyst") -> bytes:
     else:
         doc.heading("Risk factors (points added to the score)")
         factors = [(str(item.get("label")), float(item.get("points") or 0)) for item in (case.risk_factors or [])]
-        doc.bar_chart(sorted(factors, key=lambda row: -row[1]), "", colour=(176, 36, 36) if (case.risk_score or 0) >= 45 else TEAL)
+        added = [row for row in factors if row[1] > 0]
+        taken_off = [row for row in factors if row[1] < 0]
+        doc.bar_chart(sorted(added, key=lambda row: -row[1]), "", colour=(176, 36, 36) if (case.risk_score or 0) >= 45 else TEAL)
+        if taken_off:
+            doc.para("Taken off for usual behaviour: " + "; ".join(f"{label} ({points:g})" for label, points in taken_off), size=8.5, color=MUTED)
         doc.para(
-            f"The factors add to {sum(points for _label, points in factors):g}; the score is capped at 100. "
+            f"The factors add to {sum(points for _label, points in factors):g}; the score is kept between 0 and 100. "
             "The score is an input. The rule layer decides hold, block or release; the model only writes notes.",
             size=8.5,
             color=MUTED,
@@ -454,6 +459,9 @@ def build_case_pdf(case_id: str, audience: str = "analyst") -> bytes:
         for event in events:
             counts[event.agent] = counts.get(event.agent, 0) + 1
         doc.bar_chart(sorted(counts.items(), key=lambda row: -row[1]), " steps")
+        reviews = [event for event in events if event.tool_name == "review_notes" and event.state == "calling_tool"]
+        if reviews:
+            doc.para("Note review by the report agent: " + _latin(str(reviews[-1].result_summary or "")) + ".", size=8.5, color=MUTED)
         verified = sum(1 for event in events if event.tool_name == "verify_handoff" and event.state == "calling_tool")
         rejected = sum(1 for event in events if event.tool_name == "verify_handoff" and event.state == "error")
         doc.para(
