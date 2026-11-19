@@ -376,22 +376,37 @@ def root():
     return {"service": "PayShield", "docs": "/docs"}
 
 
+def _find_login_user(session, identifier: str, portal: str) -> User | None:
+    """Operators sign in with their email. Customers sign in with the name they registered with."""
+    ident = identifier.strip().lower()
+    if portal == "customer":
+        spaced = " ".join(ident.split())
+        matches = (
+            session.query(User)
+            .filter(User.role == "customer", User.registered.is_(True))
+            .filter((User.username == spaced) | (User.email == ident))
+            .all()
+        )
+        return matches[0] if len(matches) == 1 else None
+    return session.query(User).filter(User.email == ident).one_or_none()
+
+
 @router.post("/api/auth/login")
 def login(body: LoginIn, request: Request):
-    email = body.email.strip().lower()
+    ident = " ".join(body.email.strip().lower().split())
     ratelimit.take("login_ip", _client_ip(request))
-    ratelimit.check("login_fail", email)
+    ratelimit.check("login_fail", ident)
     failed = False
     with session_scope() as session:
-        user = session.query(User).filter(User.email == email).one_or_none()
+        user = _find_login_user(session, ident, body.portal)
         failed = user is None or not verify_password(body.password, user.password_hash)
     if failed:
-        ratelimit.hit("login_fail", email)
-        audit(email, "sign_in_failed", email, "password not recognised")
+        ratelimit.hit("login_fail", ident)
+        audit(ident, "sign_in_failed", ident, "password not recognised")
         raise HTTPException(status_code=401, detail="Username or password is not recognised")
-    ratelimit.clear("login_fail", email)
+    ratelimit.clear("login_fail", ident)
     with session_scope() as session:
-        user = session.query(User).filter(User.email == email).one()
+        user = _find_login_user(session, ident, body.portal)
         if password_needs_upgrade(user.password_hash):
             # Legacy PBKDF2 hashes are replaced with Argon2id the first time the password is proven.
             user.password_hash = hash_password(body.password)
@@ -402,15 +417,9 @@ def login(body: LoginIn, request: Request):
         if body.portal == "customer" and user.role != "customer":
             raise HTTPException(status_code=403, detail="Operator accounts sign in on the console")
         snapshot = _public_user(user)
-        enrolled = user.totp_enrolled
         user_id = user.id
         role = user.role
-    audit(email, "sign_in", email, f"{body.portal} sign-in")
-    if body.portal == "customer":
-        pending = create_token(runtime.settings, user_id, role, purpose="totp", minutes=10)
-        if enrolled:
-            return {"totp_required": True, "enrol_required": False, "pending_token": pending, "user": snapshot}
-        return {"totp_required": False, "enrol_required": True, "pending_token": pending, "user": snapshot}
+    audit(ident, "sign_in", user_id, f"{body.portal} sign-in")
     return {**_session_tokens(user_id, role), "user": snapshot}
 
 
@@ -1247,6 +1256,20 @@ def demo_trigger(body: DemoIn, user: User = Depends(require_writer)):
     return {"case_id": case_id}
 
 
+class UnregisterIn(BaseModel):
+    customer_id: str
+
+
+@router.post("/api/demo/unregister")
+def demo_unregister(body: UnregisterIn, user: User = Depends(require_writer)):
+    from app.demo import unregister
+
+    if not unregister(body.customer_id):
+        raise HTTPException(status_code=404, detail="Unknown customer")
+    audit(user.email, "demo_unregister", body.customer_id, "returned to first-time state")
+    return {"ok": True}
+
+
 @router.post("/api/demo/reset")
 def demo_reset(user: User = Depends(require_writer)):
     from app.demo import reset_demo
@@ -1415,6 +1438,7 @@ def customer_home(user: User = Depends(require_customer)):
                 "full_name": user.full_name,
                 "bank": user.bank,
                 "phone": user.phone,
+                "must_change_password": bool(user.must_change_password),
             },
             "active": None
             if active is None
