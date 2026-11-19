@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import router
+from app.customer import router as customer_router
 from app.desk import router as desk_router
 from app.simulate import router as simulate_router
 from app.runtime import init_runtime, runtime, start_background, stop_background
@@ -31,5 +32,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(router)
+app.include_router(customer_router)
 app.include_router(desk_router)
 app.include_router(simulate_router)
