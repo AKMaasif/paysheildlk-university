@@ -209,3 +209,14 @@ class Notification(Base):
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EmergencyMode(Base):
+    """A district an analyst has put into emergency hold. Survives a restart."""
+
+    __tablename__ = "emergency_modes"
+
+    district: Mapped[str] = mapped_column(String(80), primary_key=True)
+    reason: Mapped[str] = mapped_column(String(200))
+    set_by: Mapped[str] = mapped_column(String(255))
+    set_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
