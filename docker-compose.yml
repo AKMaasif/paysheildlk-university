@@ -26,7 +26,7 @@ services:
       retries: 12
 
   backend:
-    build: ./backend
+    build: ./project
     environment:
       DATABASE_URL: postgresql+psycopg://payshield:payshield@postgres:5432/payshield
       REDIS_URL: redis://redis:6379/0
@@ -62,7 +62,7 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build: ./project/frontend
     environment:
       API_PROXY_URL: http://backend:8000
       NEXT_PUBLIC_WS_PORT: "8000"
