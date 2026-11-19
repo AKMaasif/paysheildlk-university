@@ -26,11 +26,15 @@ services:
       retries: 12
 
   backend:
-    build: ./project
+    build: ./backend
     environment:
       DATABASE_URL: postgresql+psycopg://payshield:payshield@postgres:5432/payshield
       REDIS_URL: redis://redis:6379/0
+      APP_ENV: ${APP_ENV:-development}
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-payshield-pilot}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev-only-payshield-encryption-key}
+      HMAC_KEY: ${HMAC_KEY:-dev-only-payshield-hmac-key}
+      ANSWER_PEPPER: ${ANSWER_PEPPER:-payshield-pilot-pepper}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       META_API_KEY: ${META_API_KEY:-}
@@ -62,7 +66,7 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./project/frontend
+    build: ./frontend
     environment:
       API_PROXY_URL: http://backend:8000
       NEXT_PUBLIC_WS_PORT: "8000"
