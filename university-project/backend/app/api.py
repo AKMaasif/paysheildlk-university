@@ -82,15 +82,15 @@ SCENARIOS = [
 
 AGENT_CATALOG = [
     {"id": "supervisor", "name": "Supervisor", "task": "Assigns the telecom and banking agents. The route is fixed.", "kind": "rules"},
-    {"id": "telecom", "name": "Telecom Agent", "task": "SIM swap, handset, location, and port-out.", "kind": "model"},
-    {"id": "banking", "name": "Banking Agent", "task": "Payments, new payees, and credential events.", "kind": "model"},
+    {"id": "telecom", "name": "Telecom Agent", "task": "SIM swap, handset, location, and port-out. Looks further (SIM history) when the first reads call for it.", "kind": "model"},
+    {"id": "banking", "name": "Banking Agent", "task": "Payments, new payees, and credential events. Compares the payment with what is usual for this customer.", "kind": "model"},
     {"id": "risk", "name": "Risk Agent", "task": "Turns the two feeds into a score.", "kind": "model"},
     {"id": "policy", "name": "Policy rules", "task": "Hold, block, or release. Not a model.", "kind": "rules"},
     {"id": "alert", "name": "Alert Agent", "task": "Push, email, and an SMS with no link and no code.", "kind": "model"},
     {"id": "verification", "name": "Verification Agent", "task": "Security questions, then an optional liveness placeholder.", "kind": "model"},
     {"id": "response", "name": "Response Agent", "task": "Block the transfer, request a SIM freeze, limit the account.", "kind": "model"},
-    {"id": "analytics", "name": "Analytics Agent", "task": "Counts payments by district, province and day and writes the dashboard brief. Reads only.", "kind": "model"},
-    {"id": "case", "name": "Case / Report Agent", "task": "Writes the incident report for the fraud desk.", "kind": "model"},
+    {"id": "analytics", "name": "Analytics Agent", "task": "Counts payments by district, province and day and writes the dashboard brief, and may propose a rule change that an analyst must approve.", "kind": "model"},
+    {"id": "case", "name": "Case / Report Agent", "task": "Checks each agent note against its facts, then writes the incident report for the fraud desk.", "kind": "model"},
 ]
 
 
