@@ -73,6 +73,15 @@ def apply(case_id: str, action: str, reason: str, actor_email: str) -> dict:
         "The fraud desk blocked this transfer and limited your account. No money left your account. "
         "Call your bank on the number printed on your card.",
     )
+    review = tools.review_notes(case_id)
+    emit(
+        case_id,
+        agent="case",
+        state="calling_tool",
+        tool_name="review_notes",
+        tool_args={"case_id": case_id},
+        result_summary=f"{review['checked']} agent note(s) checked against their facts, {review['replaced']} replaced",
+    )
     saved = tools.generate_report(case_id)
     emit(
         case_id,
