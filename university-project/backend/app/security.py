@@ -5,17 +5,24 @@ import re
 
 import jwt
 import pyotp
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
 from app.util import utcnow
 
+# Argon2id with the argon2-cffi defaults (RFC 9106 low-memory profile).
+_hasher = PasswordHasher()
+
+# Access tokens are short. A refresh token renews them while the person keeps using the app.
+ACCESS_MINUTES = 30
+REFRESH_MINUTES = 12 * 60
+
 
 def hash_password(password: str) -> str:
-    salt = os.urandom(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 20_000)
-    return f"pbkdf2${salt.hex()}${digest.hex()}"
+    return _hasher.hash(password)
 
 
-def verify_password(password: str, stored: str) -> bool:
+def _verify_legacy_pbkdf2(password: str, stored: str) -> bool:
     try:
         scheme, salt_hex, digest_hex = stored.split("$")
     except ValueError:
@@ -24,6 +31,27 @@ def verify_password(password: str, stored: str) -> bool:
         return False
     digest = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt_hex), 20_000)
     return hmac.compare_digest(digest.hex(), digest_hex)
+
+
+def verify_password(password: str, stored: str) -> bool:
+    stored = stored or ""
+    if stored.startswith("$argon2"):
+        try:
+            return _hasher.verify(stored, password)
+        except (VerifyMismatchError, VerificationError, InvalidHashError):
+            return False
+    return _verify_legacy_pbkdf2(password, stored)
+
+
+def password_needs_upgrade(stored: str) -> bool:
+    """True for legacy PBKDF2 hashes or Argon2 hashes made with weaker parameters."""
+    stored = stored or ""
+    if not stored.startswith("$argon2"):
+        return True
+    try:
+        return _hasher.check_needs_rehash(stored)
+    except InvalidHashError:
+        return True
 
 
 def normalise_answer(answer: str) -> str:
@@ -39,7 +67,7 @@ def answers_match(given: str, expected_hash: str, pepper: str) -> bool:
     return hmac.compare_digest(hash_answer(given, pepper), expected_hash)
 
 
-def create_token(settings, user_id: str, role: str, purpose: str = "access", minutes: int = 720) -> str:
+def create_token(settings, user_id: str, role: str, purpose: str = "access", minutes: int = ACCESS_MINUTES) -> str:
     now = int(utcnow().timestamp())
     payload = {
         "sub": user_id,
@@ -48,6 +76,7 @@ def create_token(settings, user_id: str, role: str, purpose: str = "access", min
         "iat": now,
         "exp": now + minutes * 60,
         "iss": "payshield",
+        "jti": os.urandom(8).hex(),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
@@ -57,6 +86,22 @@ def decode_token(settings, token: str, purpose: str = "access") -> dict:
     if payload.get("purpose") != purpose:
         raise jwt.InvalidTokenError("unexpected token purpose")
     return payload
+
+
+def seal_totp(secret: str) -> str:
+    """Authenticator secrets are stored AES-256-GCM encrypted."""
+    from app.crypto import encrypt
+    from app.runtime import runtime
+
+    return encrypt(secret, runtime.settings.encryption_key)
+
+
+def open_totp(stored: str | None) -> str:
+    """Decrypt a stored authenticator secret. Older plain rows still read."""
+    from app.crypto import decrypt
+    from app.runtime import runtime
+
+    return decrypt(stored or "", runtime.settings.encryption_key)
 
 
 def totp_now(secret: str) -> str:
