@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AppBar } from "@/components/CustomerChrome";
+import { FaceCapture, type Capture } from "@/components/FaceCapture";
 import { api, downloadAuthed, getToken, wsUrl } from "@/lib/api";
 
 type Prompt = {
   type?: string;
+  hints?: string[];
+  face?: { token: string; steps: string[]; instructions: string[] };
   challenge?: string;
   retake?: boolean;
   round?: number;
@@ -55,12 +58,9 @@ export default function CustomerHome() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const stream = useRef<MediaStream | null>(null);
 
   const active = home?.active || null;
   const prompt = active?.pending_prompt || null;
-  const selfieStep = prompt?.type === "liveness";
-  const selfieRetake = !!prompt?.retake;
 
   function load() {
     return Promise.all([
@@ -108,29 +108,6 @@ export default function CustomerHome() {
     if (home && !home.active && home.customer.must_change_password) router.replace("/c/password?required=1");
   }, [home, router]);
 
-  // The camera shows as soon as the selfie step opens.
-  useEffect(() => {
-    if (!selfieStep) return;
-    let cancelled = false;
-    navigator.mediaDevices
-      ?.getUserMedia({ video: { facingMode: "user" }, audio: false })
-      .then((media) => {
-        if (cancelled) return media.getTracks().forEach((t) => t.stop());
-        stream.current = media;
-        const video = document.getElementById("selfie") as HTMLVideoElement | null;
-        if (video) {
-          video.srcObject = media;
-          video.play().catch(() => undefined);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-      stream.current?.getTracks().forEach((t) => t.stop());
-      stream.current = null;
-    };
-  }, [selfieStep, selfieRetake]);
-
   async function respond(decision: "yes" | "no") {
     if (!active) return;
     setBusy(true);
@@ -161,32 +138,15 @@ export default function CustomerHome() {
     }
   }
 
-  async function captureLive() {
+  async function submitFace(capture: Capture) {
     if (!active) return;
-    const video = document.getElementById("selfie") as HTMLVideoElement | null;
-    if (!video) return;
     setBusy(true);
     setError("");
     try {
-      const live = stream.current ?? (await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false }));
-      if (video.srcObject !== live) video.srcObject = live;
-      await video.play();
-      const grab = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = 320;
-        canvas.height = 240;
-        canvas.getContext("2d")?.drawImage(video, 0, 0, 320, 240);
-        return canvas.toDataURL("image/jpeg", 0.7).split(",")[1];
-      };
-      const first = grab();
-      await new Promise((resolve) => setTimeout(resolve, 700));
-      const second = grab();
-      live.getTracks().forEach((track) => track.stop());
-      stream.current = null;
-      await api(`/api/customer/cases/${active.id}/liveness`, { portal: "customer", method: "POST", body: JSON.stringify({ frames: [first, second] }) });
+      await api(`/api/customer/cases/${active.id}/liveness`, { portal: "customer", method: "POST", body: JSON.stringify(capture) });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The camera could not be used");
+      setError(err instanceof Error ? err.message : "The face scan could not be sent");
     } finally {
       setBusy(false);
     }
@@ -239,15 +199,20 @@ export default function CustomerHome() {
           )}
 
           {active && prompt?.type === "liveness" && (
-            <section className="cs-panel alert" style={{ marginBottom: 24 }}>
-              <span className="tag">Step 1 of 2 · Live selfie</span>
-              <div className="cs-ask" style={{ fontSize: 22 }}>Show us it is really you</div>
-              <p style={{ color: "var(--cs-muted)", marginBottom: 14 }}>{prompt.challenge || "Use the camera. A saved photo is not accepted."} {prompt.retake ? "Let us try once more." : ""}</p>
-              <div className="cs-camera" style={{ maxWidth: 440 }}>
-                <video id="selfie" autoPlay playsInline muted />
-                <div className="ring" />
-              </div>
-              <button className="cs-btn primary" style={{ marginTop: 14 }} disabled={busy} onClick={captureLive}>Capture two frames</button>
+            <section className="cs-panel alert" style={{ marginBottom: 24, maxWidth: 560 }}>
+              <span className="tag">Step 1 of 2 · Confirm it is you</span>
+              <div className="cs-ask" style={{ fontSize: 22 }}>Scan your face again</div>
+              <p style={{ color: "var(--cs-muted)", marginBottom: 14 }}>
+                We compare this scan with the one you made when you registered. It must show a live person following the instructions. {prompt.retake ? "Let us try once more." : ""}
+              </p>
+              <FaceCapture
+                key={prompt.face?.token || "legacy"}
+                challenge={prompt.face || null}
+                busy={busy}
+                hints={prompt.hints}
+                onCapture={submitFace}
+                label={prompt.retake ? "Scan again" : "Start face scan"}
+              />
             </section>
           )}
 
