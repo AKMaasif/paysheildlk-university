@@ -1,0 +1,3 @@
+# Python dependencies for PayShield. The list lives in backend/requirements.txt
+# so the Docker build and this folder always install the same versions.
+-r ../backend/requirements.txt
