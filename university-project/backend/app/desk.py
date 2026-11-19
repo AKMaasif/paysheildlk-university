@@ -1,22 +1,18 @@
-import base64
-import io
+import secrets
 from datetime import timedelta
 
-import pyotp
-import qrcode
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app import ratelimit
 from app.answers import QUESTION_BANK, hash_secret
 from app.charters import CHARTERS
-from app.crypto import encrypt
 from app.db import session_scope
 from app.emergency import breaker_status
 from app.ledger import audit, verify_audit_chain
 from app.models import Case, SecurityAnswer, Transaction, User
 from app.runtime import runtime
-from app.security import hash_password, open_totp, totp_valid
+from app.security import hash_password
 from app.util import aware, nid, utcnow
 
 router = APIRouter()
@@ -37,18 +33,17 @@ class AnswerIn(BaseModel):
 
 
 class EnrolIn(BaseModel):
-    full_name: str
+    """The bank's record for a customer. The customer claims it later by registering in the app."""
+
+    full_name: str = Field(min_length=2, max_length=200)
     phone: str
     email: str
+    nic: str = Field(min_length=9, max_length=20)
+    account_number: str = Field(min_length=6, max_length=32)
     district: str
-    username: str
-    password: str = Field(min_length=8)
+    branch: str = ""
+    balance_lkr: int = Field(default=0, ge=0, le=1_000_000_000)
     answers: list[AnswerIn]
-
-
-class ConfirmIn(BaseModel):
-    user_id: str
-    code: str
 
 
 class KillIn(BaseModel):
@@ -87,31 +82,44 @@ def questions(authorization: str | None = Header(default=None)):
 
 @router.post("/api/enrol")
 def enrol(body: EnrolIn, authorization: str | None = Header(default=None)):
+    from app.customer import clean_account, clean_nic, clean_phone
+    from app.geo import province_of
+
     actor = _writer(authorization)
-    phone = body.phone.strip().replace(" ", "")
-    if not phone.startswith("+94") or len(phone) < 11:
-        raise HTTPException(status_code=400, detail="Phone must be in +94 format")
+    phone = clean_phone(body.phone)
+    if not phone.startswith("+94") or len(phone) != 12:
+        raise HTTPException(status_code=400, detail="Mobile number must be a Sri Lankan number, for example +94771234567")
     if len(body.answers) < 6:
         raise HTTPException(status_code=400, detail="Pick at least six verification questions")
     known = {item["code"]: item["prompt"] for item in QUESTION_BANK}
-    secret = pyotp.random_base32()
+    email = body.email.strip().lower()
+    account = clean_account(body.account_number)
+    nic = clean_nic(body.nic)
     user_id = nid("cus")
     with session_scope() as session:
-        if session.query(User).filter(User.email == body.email.strip().lower()).one_or_none():
-            raise HTTPException(status_code=409, detail="That email is already enrolled")
+        if session.query(User).filter(User.email == email).one_or_none():
+            raise HTTPException(status_code=409, detail="That email is already on a customer record")
+        if session.query(User).filter(User.role == "customer", User.account_number == account).first():
+            raise HTTPException(status_code=409, detail="That account number is already on a customer record")
         session.add(
             User(
                 id=user_id,
-                email=body.email.strip().lower(),
-                username=body.username.strip().lower(),
-                full_name=body.full_name.strip(),
-                password_hash=hash_password(body.password),
+                email=email,
+                full_name=" ".join(body.full_name.split()),
+                # The customer sets the real password when they register. Until then this one cannot be used.
+                password_hash=hash_password(secrets.token_urlsafe(24)),
                 role="customer",
                 phone=phone,
+                bank="BankCylone",
                 district=body.district.strip(),
-                totp_secret=encrypt(secret, runtime.settings.encryption_key),
+                province=province_of(body.district.strip()),
+                branch=body.branch.strip() or None,
+                account_number=account,
+                nic=nic,
+                balance_lkr=body.balance_lkr,
+                registered=False,
                 totp_enrolled=False,
-                status="pending",
+                status="active",
                 created_at=utcnow(),
             )
         )
@@ -127,32 +135,8 @@ def enrol(body: EnrolIn, authorization: str | None = Header(default=None)):
                     answer_hash=hash_secret(item.answer, item.code),
                 )
             )
-    uri = pyotp.TOTP(secret).provisioning_uri(name=body.email, issuer_name="PayShield.lk")
-    image = qrcode.make(uri)
-    buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
     audit(actor.email, "enrol_customer", user_id, body.district)
-    return {
-        "user_id": user_id,
-        "otpauth": uri,
-        "qr_png_base64": base64.b64encode(buffer.getvalue()).decode(),
-    }
-
-
-@router.post("/api/enrol/confirm")
-def enrol_confirm(body: ConfirmIn, authorization: str | None = Header(default=None)):
-    actor = _writer(authorization)
-    with session_scope() as session:
-        user = session.get(User, body.user_id)
-        if user is None or user.totp_enrolled:
-            raise HTTPException(status_code=404, detail="Enrolment is not waiting for a code")
-        secret = open_totp(user.totp_secret)
-        if not totp_valid(secret, body.code):
-            raise HTTPException(status_code=401, detail="That authenticator code was not accepted")
-        user.totp_enrolled = True
-        user.status = "active"
-    audit(actor.email, "enrol_totp", body.user_id, "confirmed")
-    return {"enrolled": True}
+    return {"user_id": user_id, "registered": False}
 
 
 @router.get("/api/security/status")
