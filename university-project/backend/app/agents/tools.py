@@ -231,10 +231,18 @@ def deliver_report(case_id: str) -> dict:
     from app.report_pdf import build_case_pdf
     from app.util import aware
 
+    from app.models import User
+
     with session_scope() as session:
         case = session.get(Case, case_id)
         user_id, status, amount, payee = case.customer_id, case.status, case.amount_lkr, case.payee or "the payee"
         moment = aware(case.updated_at).astimezone(ZoneInfo("Asia/Colombo"))
+        # A payment that looked like a SIM-swap takeover means the password may be known to someone else.
+        # Once the case is closed the customer must choose a new one.
+        if case.policy_decision in {"hold", "block"}:
+            owner = session.get(User, user_id)
+            if owner is not None and owner.registered:
+                owner.must_change_password = True
     word = _OUTCOME_WORD.get(status, "updated")
     when = moment.strftime("%d %b at %H:%M")
     receipt = build_case_pdf(case_id, "customer")
