@@ -8,6 +8,7 @@ provider would see.
 """
 
 import re
+import unicodedata
 
 # Order matters: the longer, more specific shapes go first.
 _PATTERNS: list[tuple[str, re.Pattern]] = [
@@ -55,3 +56,27 @@ def guard(text: str) -> str:
     if text and _SECRET_LABELS.search(text):
         raise PrivacyViolation("Text for the model contains a secret field and was not sent.")
     return mask(text)
+
+
+_INVISIBLE = re.compile(r"[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
+_ROLE_MARKER = re.compile(r"\b(system|assistant|developer|human|user|instruction[s]?)\s*:", re.IGNORECASE)
+
+
+def untrusted(text, limit: int = 80) -> str:
+    """Text typed by a third party, such as a payee name, made safe to place in a prompt.
+
+    It is normalised (full-width letters become plain ones), stripped of control, zero-width and
+    direction-changing characters, reduced to one line, stripped of markup brackets, cut short, and
+    wrapped in guillemets. The system prompt tells the model that anything inside them is data, never
+    an instruction. This lowers the chance that hostile text steers a model. It is not a guarantee,
+    which is why no model output can change a hold, block or release.
+    """
+    value = unicodedata.normalize("NFKC", "" if text is None else str(text))
+    value = _INVISIBLE.sub("", value)
+    value = "".join(" " if unicodedata.category(c).startswith("C") else c for c in value)
+    value = re.sub(r"[<>{}\[\]`\u00ab\u00bb]", " ", value)
+    value = _ROLE_MARKER.sub(lambda m: m.group(1) + " -", value)
+    value = re.sub(r"\s+", " ", value).strip()
+    if len(value) > limit:
+        value = value[: limit - 1].rstrip() + "\u2026"
+    return "\u00ab" + value + "\u00bb"
