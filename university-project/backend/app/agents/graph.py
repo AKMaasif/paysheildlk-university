@@ -7,6 +7,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, Send, interrupt
 
 from app.agents import tools
+from app.privacy import mask, untrusted
 from app.events import emit
 from app.ledger import set_case_fields
 from app.notify import BLOCKED_SMS
@@ -41,6 +42,13 @@ class CaseState(TypedDict, total=False):
     step: str
     liveness_strikes: int
     knowledge_round: int
+    face_unsure: int
+    quality_retakes: int
+    max_rounds: int
+    face_embedding: list
+    face_score: float
+    face_verdict: str
+    escalation_reason: str
     _stored: list
     # Signed handoffs, keyed "sender>receiver". See app/protocol.py.
     _inbox: Annotated[dict, _merge_inbox]
@@ -185,10 +193,22 @@ def _summarise(name: str, result: dict) -> str:
         return result.get("detail") or "Answers checked"
     if name == "create_case":
         return f"Case {result.get('case_id')} is open"
+    if name == "update_face_template":
+        return "Stored face templates refreshed" if result.get("updated") else "Templates already cover this look"
+    if name == "review_notes":
+        return f"{result.get('checked')} agent note(s) checked against their facts, {result.get('replaced')} replaced"
     if name == "generate_report":
         return f"Report {result.get('report_id')} filed, PDF sha256 {str(result.get('pdf_sha256'))[:12]}"
     if name == "deliver_report":
         return f"Receipt sent: email {result.get('email')}, SMS {result.get('sms')}, push {result.get('push')}"
+    if name == "get_sim_history":
+        return f"{len(result.get('events') or [])} SIM event(s) in 30 days, {result.get('swaps_30d')} swap(s)"
+    if name == "get_customer_profile":
+        return f"{result.get('payments')} earlier payments, usual high Rs. {result.get('usual_high_lkr'):,}, payee paid {result.get('payee_payments')} time(s) before"
+    if name == "get_payee_history":
+        return f"{result.get('earlier_payments')} earlier payment(s) to this payee"
+    if name == "get_credential_events":
+        return f"{len(result.get('events') or [])} sign-in or reset event(s) in 48 hours"
     if name in {"get_device_change", "get_location_events", "get_port_out_status"}:
         count = len(result.get("events") or [])
         return f"{count} {result.get('event_type')} event(s)"
@@ -211,6 +231,8 @@ def _note(case_id: str, agent: str, facts: str, handoff_to: str | None = None) -
         fell_back=note["fell_back"],
         fallback_from=note.get("fallback_from"),
         latency_ms=note["latency_ms"],
+        # What the note was written from, masked, so the Report agent can check the note against it.
+        tool_args={"facts": mask(facts)[:900]},
         handoff_from=agent if handoff_to else None,
         handoff_to=handoff_to,
     )
@@ -252,40 +274,66 @@ def fanout(state: CaseState):
     return [Send("telecom", state), Send("banking", state)]
 
 
+def _investigate(case_id: str, agent: str, calls: dict, args: dict) -> dict:
+    """Core reads, then extra lookups chosen by the planner. Every call goes through _tool, so the
+    charter is enforced and each one is recorded."""
+    from app.investigator import investigate
+    from app.runtime import runtime
+
+    if runtime.settings.mcp_tools:
+        from app.mcp_tools import call_tool
+
+        # The same lookups, reached through the Model Context Protocol instead of a direct call.
+        calls = {name: (lambda a, name=name: call_tool(agent, name, a)) for name in calls}
+
+    def run_tool(name, tool_args, note):
+        if note:
+            emit(
+                case_id,
+                agent=agent,
+                state="thinking",
+                message=f"Looking further: {note['why']}",
+                provider=note["planner"],
+                model="deterministic" if note["planner"] == "rules" else "planner",
+            )
+        return _tool(case_id, agent, name, tool_args, lambda: calls[name](tool_args))
+
+    out = investigate(agent, run_tool, lambda name: args[name], case_id)
+    for step in out["plan"]:
+        if step["step"] == "refused":
+            emit(
+                case_id,
+                agent=agent,
+                state="thinking",
+                message=f"The planner asked for {step['asked_for']!r}, which is not an allowed lookup here. Ignored.",
+                provider=step["planner"],
+                model="planner",
+            )
+    return out
+
+
 def telecom(state: CaseState) -> dict:
     pace()
     case_id = state["case_id"]
     phone = state["phone"]
     _receive(state, "telecom", "telecom", ("supervisor",))
     emit(case_id, agent="telecom", state="thinking", message="Reading the SIM profile for this number.")
-    swap = _tool(
-        case_id,
-        "telecom",
-        "get_sim_swap_status",
-        {"phoneNumber": phone, "maxAge": 240},
-        lambda: tools.get_sim_swap_status(phone, 240),
-    )
-    device = _tool(
-        case_id,
-        "telecom",
-        "get_device_change",
-        {"phoneNumber": phone},
-        lambda: tools.get_device_change(phone),
-    )
-    location = _tool(
-        case_id,
-        "telecom",
-        "get_location_events",
-        {"phoneNumber": phone},
-        lambda: tools.get_location_events(phone),
-    )
-    port = _tool(
-        case_id,
-        "telecom",
-        "get_port_out_status",
-        {"phoneNumber": phone},
-        lambda: tools.get_port_out_status(phone),
-    )
+    calls = {
+        "get_sim_swap_status": lambda a: tools.get_sim_swap_status(a["phoneNumber"], a["maxAge"]),
+        "get_device_change": lambda a: tools.get_device_change(a["phoneNumber"]),
+        "get_location_events": lambda a: tools.get_location_events(a["phoneNumber"]),
+        "get_port_out_status": lambda a: tools.get_port_out_status(a["phoneNumber"]),
+        "get_sim_history": lambda a: tools.get_sim_history(a["phoneNumber"]),
+    }
+    args = {
+        "get_sim_swap_status": {"phoneNumber": phone, "maxAge": 240},
+        "get_device_change": {"phoneNumber": phone},
+        "get_location_events": {"phoneNumber": phone},
+        "get_port_out_status": {"phoneNumber": phone},
+        "get_sim_history": {"phoneNumber": phone},
+    }
+    seen = _investigate(case_id, "telecom", calls, args)["seen"]
+    swap, device, location, port = (seen[k] for k in ("get_sim_swap_status", "get_device_change", "get_location_events", "get_port_out_status"))
     swapped = "yes" if (swap.get("checkSimSwap") or {}).get("swapped") else "no"
     facts = (
         f"swapped: {swapped}\n"
@@ -294,6 +342,9 @@ def telecom(state: CaseState) -> dict:
         f"location events: {len(location.get('events') or [])}\n"
         f"port-out events: {len(port.get('events') or [])}\n"
     )
+    if "get_sim_history" in seen:
+        history = seen["get_sim_history"]
+        facts += f"sim events in 30 days: {len(history.get('events') or [])} (swaps: {history.get('swaps_30d')})\n"
     note = _note(case_id, "telecom", facts, handoff_to="risk")
     set_case_fields(case_id, telecom_summary=note["text"])
     return {"telecom_summary": note["text"], **_send(case_id, "telecom", "risk", {"swapped": swapped})}
@@ -304,20 +355,38 @@ def banking(state: CaseState) -> dict:
     case_id = state["case_id"]
     _receive(state, "banking", "banking", ("supervisor",))
     emit(case_id, agent="banking", state="thinking", message="Reading recent account activity.")
-    activity = _tool(
-        case_id,
-        "banking",
-        "get_recent_transactions",
-        {"customer_id": state["customer_id"]},
-        lambda: tools.get_recent_transactions(state["customer_id"]),
-    )
+    customer, payee = state["customer_id"], state["payee"]
+    calls = {
+        "get_recent_transactions": lambda a: tools.get_recent_transactions(a["customer_id"]),
+        "get_customer_profile": lambda a: tools.get_customer_profile(a["customer_id"], a["payee"], a["amount_lkr"]),
+        "get_payee_history": lambda a: tools.get_payee_history(a["customer_id"], a["payee"]),
+        "get_credential_events": lambda a: tools.get_credential_events(a["customer_id"]),
+    }
+    args = {
+        "get_recent_transactions": {"customer_id": customer},
+        "get_customer_profile": {"customer_id": customer, "payee": payee, "amount_lkr": state["amount_lkr"]},
+        "get_payee_history": {"customer_id": customer, "payee": payee},
+        "get_credential_events": {"customer_id": customer},
+    }
+    seen = _investigate(case_id, "banking", calls, args)["seen"]
+    activity = seen["get_recent_transactions"]
     new_payee = "yes" if any(item.get("new_payee") for item in activity["transactions"][:4]) else "no"
     facts = (
         f"amount: {lkr(state['amount_lkr'])}\n"
-        f"payee: {state['payee']}\n"
+        f"payee: {untrusted(state['payee'])}\n"
         f"new_payee: {new_payee}\n"
         f"events: {len(activity['transactions'])}\n"
     )
+    if "get_customer_profile" in seen:
+        prof = seen["get_customer_profile"]
+        facts += (
+            f"usual payment high: {lkr(prof['usual_high_lkr'])} over {prof['payments']} earlier payments; "
+            f"this payee paid {prof['payee_payments']} time(s) before, established: {'yes' if prof['payee_established'] else 'no'}\n"
+        )
+    if "get_payee_history" in seen:
+        facts += f"earlier payments to this payee: {seen['get_payee_history']['earlier_payments']}\n"
+    if "get_credential_events" in seen:
+        facts += f"sign-ins and password resets in 48 hours: {len(seen['get_credential_events']['events'])}\n"
     note = _note(case_id, "banking", facts, handoff_to="risk")
     set_case_fields(case_id, banking_summary=note["text"])
     return {"banking_summary": note["text"], **_send(case_id, "banking", "risk", {"new_payee": new_payee})}
@@ -337,7 +406,7 @@ def risk(state: CaseState) -> dict:
         {"customer_id": state["customer_id"], "transaction_id": state["transaction_id"]},
         lambda: tools.compute_risk_score(state["customer_id"], state["transaction_id"]),
     )
-    facts = f"score: {scored['score']}\nfactors: {scored['factors']}\nswapped: {scored['signals']['swapped']}\n"
+    facts = f"score: {scored['score']} (capped at 100)\nfactors: {scored['factors']}\nswapped: {scored['signals']['swapped']}\n"
     note = _note(case_id, "risk", facts, handoff_to="policy")
     set_case_fields(
         case_id,
@@ -473,7 +542,7 @@ def alert(state: CaseState) -> dict:
         alert_count=1,
         pending_prompt=prompt,
     )
-    _note(case_id, "alert", f"question: {question}\nchannels: push, email, sms", handoff_to="customer")
+    _note(case_id, "alert", f"question: Did you make this payment of {lkr(amount)} to {untrusted(payee)}?\nchannels: push, email, sms", handoff_to="customer")
     emit(
         case_id,
         agent="alert",
@@ -519,6 +588,21 @@ def _round_prompt(customer_id: str, round_no: int) -> dict:
     return {"stored": stored, "asked": [item["id"] for item in shown], "public": {"type": "knowledge", "round": round_no, "questions": shown, "notice": "" if round_no == 1 else "Let's try another set"}}
 
 
+def _liveness_prompt(case_id: str, retake: bool = False, hints: list | None = None) -> dict:
+    """The selfie step. With real face verification it carries a signed random challenge for this case."""
+    from app import face
+
+    prompt: dict = {"type": "liveness", "challenge": "Turn your head slightly between the two frames."}
+    if face.mode() == "dlib":
+        ch = face.issue_challenge(case_id)
+        prompt = {"type": "liveness", "challenge": "Look at the camera and follow the instructions.", "face": ch}
+    if retake:
+        prompt["retake"] = True
+    if hints:
+        prompt["hints"] = list(hints)[:4]
+    return prompt
+
+
 def verification_prep(state: CaseState) -> dict:
     pace()
     case_id = state["case_id"]
@@ -526,7 +610,7 @@ def verification_prep(state: CaseState) -> dict:
     if order.get("customer_decision") != "yes":
         raise PermissionError("verification only starts on a signed yes")
     now = utcnow()
-    prompt = {"type": "liveness", "challenge": "Turn your head slightly between the two frames."}
+    prompt = _liveness_prompt(case_id)
     set_case_fields(
         case_id,
         status="waiting_liveness",
@@ -560,6 +644,10 @@ def verify_wait(state: CaseState) -> dict:
     case_id = state["case_id"]
     if step == "liveness":
         enforce("verification", "liveness_check")
+        from app import face
+
+        if face.mode() != "legacy":
+            return _face_step(state, payload)
         frames = []
         for frame in payload.get("frames") or []:
             if isinstance(frame, (bytes, bytearray)):
@@ -603,7 +691,7 @@ def verify_wait(state: CaseState) -> dict:
         set_case_fields(case_id, verification_passed=True, verification_detail=checked["detail"], pending_prompt=None)
         return {"verification_passed": True, "verification_detail": checked["detail"], "step": "passed", "customer_decision": "yes", "timed_out": False, **_send(case_id, "verify_wait", "release", {"verified": True})}
     round_no = int(state.get("knowledge_round") or 1)
-    if round_no >= 4:
+    if round_no >= int(state.get("max_rounds") or 4):
         set_case_fields(case_id, verification_passed=False, verification_detail="Four knowledge rounds failed.", pending_prompt=None)
         return {"verification_passed": False, "step": "failed", "customer_decision": "yes", "timed_out": False, **_send(case_id, "verify_wait", "response", {"verified": False, "reason": "questions"})}
     nxt = round_no + 1
@@ -611,6 +699,77 @@ def verify_wait(state: CaseState) -> dict:
     set_case_fields(case_id, status="waiting_verification", knowledge_round=nxt, pending_prompt=prompt["public"])
     emit(case_id, agent="verification", state="waiting_for_customer", message="Let's try another set.")
     return {"step": "knowledge", "knowledge_round": nxt, "customer_decision": "yes", "timed_out": False, "_stored": prompt["asked"]}
+
+
+def _face_step(state: CaseState, payload: dict) -> dict:
+    """Liveness and identity: a live capture answered a random challenge, and the face matches the one on file."""
+    from app import face
+    from app.charters import enforce
+    from app.db import session_scope
+    from app.models import User
+
+    case_id, customer_id = state["case_id"], state["customer_id"]
+    enforce("verification", "face_match")
+    with session_scope() as session:
+        user = session.get(User, customer_id)
+        sealed = user.face_ref if user else None
+    frames = payload.get("frames") or []
+    try:
+        result = face.verify(sealed, frames, payload.get("offsets_ms") or [], payload.get("challenge"), case_id)
+    except (face.ChallengeError, face.BadCapture) as exc:
+        # An expired or reused challenge, or a broken upload, is not evidence against the customer.
+        result = face.Result("poor_quality", hints=[str(exc)])
+    live = result.liveness or {}
+    emit(
+        case_id,
+        agent="verification",
+        state="calling_tool",
+        tool_name="liveness_check",
+        tool_args={"frames": len(payload.get("frames") or []), "challenge": (live.get("challenge") or {})},
+        result_summary=("live person, challenge followed" if live.get("live") else ("not accepted as live: " + "; ".join(result.hints[:2])) if result.verdict == "fake" else "not assessed")
+        if result.verdict not in {"unavailable", "no_template"}
+        else result.hints[0],
+    )
+    emit(
+        case_id,
+        agent="verification",
+        state="calling_tool",
+        tool_name="face_match",
+        tool_args={"templates": "on file", "frames_used": result.frames_used},
+        result_summary=(
+            f"similarity {result.score:g}/100 ({result.verdict}), distance {result.distance}"
+            if result.score is not None
+            else f"{result.verdict}: {'; '.join(result.hints[:2])}"
+        ),
+    )
+    decision = face.decide(result, state)
+    carry = {k: decision[k] for k in ("liveness_strikes", "face_unsure", "quality_retakes") if k in decision}
+    set_case_fields(case_id, face_score=result.score, face_verdict=result.verdict)
+    base = {"customer_decision": "yes", "timed_out": False, "face_verdict": result.verdict, **carry}
+    nxt = decision["next"]
+    if nxt == "questions":
+        prompt = _round_prompt(customer_id, 1)
+        set_case_fields(case_id, status="waiting_verification", knowledge_round=1, pending_prompt=prompt["public"], liveness_strikes=carry.get("liveness_strikes", state.get("liveness_strikes") or 0))
+        emit(case_id, agent="verification", state="waiting_for_customer", message=("Face matched. Now the security questions." if result.verdict == "match" else "Face likely matched. Two rounds of security questions will decide."))
+        out = {**base, "step": "knowledge", "knowledge_round": 1, "max_rounds": decision["max_rounds"], "face_score": result.score or 0.0, "_stored": prompt["asked"]}
+        if result.embedding and (result.score or 0) >= face.REFRESH_SCORE and result.verdict == "match":
+            out["face_embedding"] = result.embedding
+        return out
+    if nxt == "retake":
+        default = {
+            "no_match": "The scan did not match the face on file. Face the camera in good light and try again.",
+            "uncertain": "We could not be sure it is you. Face the camera in good light, with your face fully in view, and try again.",
+        }.get(result.verdict, "Please try again.")
+        hints = result.hints or [default]
+        set_case_fields(case_id, status="waiting_liveness", pending_prompt=_liveness_prompt(case_id, retake=True, hints=hints))
+        emit(case_id, agent="verification", state="waiting_for_customer", message="Another face scan is needed. " + hints[0])
+        return {**base, "step": "liveness"}
+    if nxt == "block":
+        set_case_fields(case_id, verification_passed=False, verification_detail="The face check failed twice.", pending_prompt=None)
+        return {**base, "verification_passed": False, "step": "failed", **_send(case_id, "verify_wait", "response", {"verified": False, "reason": "selfie"})}
+    # review: a person decides. The money stays held and nothing is released automatically.
+    set_case_fields(case_id, verification_passed=False, verification_detail="The face check could not settle it. A person reviews the case.", pending_prompt=None)
+    return {**base, "timed_out": True, "verification_passed": False, "step": "timeout", "escalation_reason": "face", **_send(case_id, "verify_wait", "escalate", {"reason": "face"})}
 
 
 def route_verification(state: CaseState) -> str:
@@ -643,6 +802,16 @@ def release(state: CaseState) -> dict:
         {"transaction_id": state["transaction_id"], "case_id": case_id},
         lambda: tools.release_transaction(state["transaction_id"], case_id, reason),
     )
+    if sender == "verify_wait" and state.get("face_embedding") and state.get("face_verdict") == "match":
+        # A very confident match that was also confirmed by the security questions may refresh the stored
+        # templates, so a slow change in how the customer looks does not lock them out later.
+        _tool(
+            case_id,
+            "verification",
+            "update_face_template",
+            {"reason": "very confident match and the security questions passed"},
+            lambda: tools.refresh_face_template(state["customer_id"], state["face_embedding"]),
+        )
     status = "closed_released" if state.get("customer_decision") == "yes" else "closed_cleared"
     set_case_fields(case_id, status=status, pending_prompt=None)
     tools.outcome_notice(
@@ -712,7 +881,11 @@ def escalate(state: CaseState) -> dict:
         case_id,
         agent="supervisor",
         state="done",
-        message="No customer response inside 10 minutes. A human analyst has the case. The transfer stays held.",
+        message=(
+            "The face check could not settle who this is. A human analyst has the case. The transfer stays held."
+            if state.get("escalation_reason") == "face"
+            else "No customer response inside 10 minutes. A human analyst has the case. The transfer stays held."
+        ),
         handoff_from="alert",
         handoff_to="case",
         provider="rules",
@@ -728,7 +901,11 @@ def escalate(state: CaseState) -> dict:
         state["customer_id"],
         case_id,
         "Payment still on hold",
-        "We did not get an answer in time. The payment is still held and a person on the fraud desk has the case.",
+        (
+            "We could not confirm your identity from the face check. The payment is still held and a person on the fraud desk will review it."
+            if state.get("escalation_reason") == "face"
+            else "We did not get an answer in time. The payment is still held and a person on the fraud desk has the case."
+        ),
     )
     return {"final_status": "escalated", "timed_out": True, "customer_decision": "timeout", **_send(case_id, "escalate", "report", {"final_status": "escalated"})}
 
@@ -738,6 +915,7 @@ def report(state: CaseState) -> dict:
     case_id = state["case_id"]
     _receive(state, "report", "case", ("release", "response", "escalate"))
     emit(case_id, agent="case", state="thinking", message="Writing the incident report.")
+    review = _tool(case_id, "case", "review_notes", {"case_id": case_id}, lambda: tools.review_notes(case_id))
     saved = _tool(case_id, "case", "generate_report", {"case_id": case_id}, lambda: tools.generate_report(case_id))
     _tool(case_id, "case", "deliver_report", {"case_id": case_id, "to": ["dashboard", "email", "sms", "push"]}, lambda: tools.deliver_report(case_id))
     _note(case_id, "case", f"report: {saved.get('report_id')}\nstatus: {state.get('final_status')}")
