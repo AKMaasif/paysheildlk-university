@@ -126,6 +126,14 @@ def _ensure_columns(engine) -> None:
             "username": "VARCHAR(80)",
             "totp_failures": "INTEGER DEFAULT 0",
             "totp_locked_until": "TIMESTAMP",
+            "nic": "VARCHAR(20)",
+            "balance_lkr": "INTEGER DEFAULT 0",
+            "registered": "BOOLEAN DEFAULT 0",
+            "registered_at": "TIMESTAMP",
+            "must_change_password": "BOOLEAN DEFAULT 0",
+            "password_changed_at": "TIMESTAMP",
+            "face_ref": "TEXT",
+            "face_hash": "VARCHAR(64)",
         },
         "cases": {
             "liveness_strikes": "INTEGER DEFAULT 0",
@@ -186,11 +194,13 @@ def init_runtime() -> None:
     runtime.checkpointer = saver
     runtime.checkpointer_kind = kind
     runtime.graph = build_graph(saver)
+    from app.seed import upgrade_existing
     from app.simbook import refresh as refresh_simulated_book
     from app.util import utcnow
 
     with session_scope() as session:
         created = seed(session, settings)
+        upgrade_existing(session)
         # Databases made by an older build get the current simulated book in place.
         rebuilt = refresh_simulated_book(session, utcnow())
     if created:
