@@ -104,6 +104,8 @@ class Case(Base):
     banking_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     risk_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     customer_decision: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    face_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    face_verdict: Mapped[str | None] = mapped_column(String(20), nullable=True)
     verification_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     verification_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     sim_freeze_ref: Mapped[str | None] = mapped_column(String(40), nullable=True)
@@ -229,3 +231,32 @@ class EmergencyMode(Base):
     reason: Mapped[str] = mapped_column(String(200))
     set_by: Mapped[str] = mapped_column(String(255))
     set_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PolicySetting(Base):
+    """A tunable number in the rule table. Only an analyst's approval changes one."""
+
+    __tablename__ = "policy_settings"
+
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    value: Mapped[int] = mapped_column(Integer)
+    updated_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PolicyProposal(Base):
+    """A change the Analytics agent suggests. It changes nothing until an analyst approves it."""
+
+    __tablename__ = "policy_proposals"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    key: Mapped[str] = mapped_column(String(40))
+    current: Mapped[int] = mapped_column(Integer)
+    proposed: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[str] = mapped_column(Text)
+    evidence: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    decided_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decision_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
