@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AuthSide } from "@/components/AuthSide";
+import { FaceCapture, type Capture, type Challenge } from "@/components/FaceCapture";
 import { api, setToken, setUser } from "@/lib/api";
 
 type Step = 1 | 2 | 3;
@@ -20,39 +21,12 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [show, setShow] = useState(false);
-  const [frames, setFrames] = useState<string[]>([]);
-  const [still, setStill] = useState("");
-  const [cameraError, setCameraError] = useState("");
-  const [capturing, setCapturing] = useState(false);
+  const [challenge, setChallenge] = useState<Challenge>(null);
+  const [hints, setHints] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const stream = useRef<MediaStream | null>(null);
-  const video = useRef<HTMLVideoElement | null>(null);
 
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: e.target.value });
-
-  // The camera starts when the face-scan step opens and stops when it closes.
-  useEffect(() => {
-    if (step !== 2 || still) return;
-    let cancelled = false;
-    setCameraError("");
-    navigator.mediaDevices
-      ?.getUserMedia({ video: { facingMode: "user" }, audio: false })
-      .then((media) => {
-        if (cancelled) return media.getTracks().forEach((t) => t.stop());
-        stream.current = media;
-        if (video.current) {
-          video.current.srcObject = media;
-          video.current.play().catch(() => undefined);
-        }
-      })
-      .catch(() => setCameraError("The camera could not be opened. Allow camera access in your browser, then try again."));
-    return () => {
-      cancelled = true;
-      stream.current?.getTracks().forEach((t) => t.stop());
-      stream.current = null;
-    };
-  }, [step, still]);
 
   function detailsProblem(): string {
     if (form.full_name.trim().split(/\s+/).length < 2) return "Enter your full name, first and last, as BankCylone has it.";
@@ -70,61 +44,55 @@ export default function Register() {
     if (!problem) setStep(2);
   }
 
-  async function scan() {
-    const el = video.current;
-    if (!el || !stream.current) return;
-    setCapturing(true);
-    setError("");
-    const grab = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = 320;
-      canvas.height = 240;
-      canvas.getContext("2d")?.drawImage(el, 0, 0, 320, 240);
-      return canvas.toDataURL("image/jpeg", 0.7);
-    };
-    const first = grab();
-    await new Promise((r) => setTimeout(r, 900));
-    const second = grab();
-    setFrames([first.split(",")[1], second.split(",")[1]]);
-    setStill(first);
-    setCapturing(false);
-  }
-
-  function retake() {
-    setFrames([]);
-    setStill("");
-  }
-
-  const rulesOk = RULES.every(([, test]) => test(password));
-  const same = password.length > 0 && password === confirm;
-
-  async function create(event: React.FormEvent) {
+  function toScan(event: React.FormEvent) {
     event.preventDefault();
     setError("");
     if (!rulesOk) return setError("Choose a password that meets both rules below.");
     if (!same) return setError("The two passwords are not the same.");
+    setStep(3);
+  }
+
+  // A fresh random challenge each time the face scan opens.
+  useEffect(() => {
+    if (step !== 3) return;
+    setChallenge(null);
+    api<{ mode: string; token: string; steps: string[]; instructions: string[] }>("/api/customer/register/challenge")
+      .then((c) => setChallenge(c.mode === "legacy" ? { token: "", steps: [], instructions: [] } : c))
+      .catch((err) => setError(err.message));
+  }, [step]);
+
+  const rulesOk = RULES.every(([, test]) => test(password));
+  const same = password.length > 0 && password === confirm;
+
+  async function create(capture: Capture) {
+    setError("");
+    setHints([]);
     setBusy(true);
     try {
       const body = await api<{ token: string; refresh_token?: string; user: unknown }>("/api/customer/register", {
         method: "POST",
-        body: JSON.stringify({ ...form, password, confirm_password: confirm, frames }),
+        body: JSON.stringify({ ...form, password, confirm_password: confirm, frames: capture.frames, offsets_ms: capture.offsets_ms, challenge: capture.challenge }),
       });
       setToken("customer", body.token, body.refresh_token);
       setUser("customer", body.user);
       router.replace("/c/home");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Registration failed";
-      setError(message);
       setBusy(false);
-      if (message.includes("do not match")) setStep(1);
-      else if (message.includes("face scan")) {
-        retake();
-        setStep(2);
+      if (message.includes("do not match")) {
+        setError(message);
+        setStep(1);
+      } else if (message.includes("face scan")) {
+        setError("The face scan was not accepted.");
+        setHints(message.replace(/^The face scan (was not accepted|did not pass)\.?\s*/, "").split(/(?<=\.)\s+/).filter(Boolean));
+        api<{ mode: string; token: string; steps: string[]; instructions: string[] }>("/api/customer/register/challenge").then((c) => setChallenge(c.mode === "legacy" ? { token: "", steps: [], instructions: [] } : c)).catch(() => undefined);
+      } else {
+        setError(message);
       }
     }
   }
 
-  const steps = ["Your details", "Face scan", "Password"];
+  const steps = ["Your details", "Password", "Face scan"];
 
   return (
     <div className="cs-auth">
@@ -159,32 +127,7 @@ export default function Register() {
           )}
 
           {step === 2 && (
-            <div className="cs-form">
-              {error && <div className="cs-error" role="alert">{error}</div>}
-              <div className="cs-camera">
-                {still ? <img src={still} alt="Your captured face scan" /> : cameraError ? <div className="off">{cameraError}</div> : <video ref={video} autoPlay playsInline muted />}
-                {!still && !cameraError && <div className="ring" />}
-                {!still && !cameraError && <div className="hint">Look at the camera, then turn your head slightly</div>}
-              </div>
-              <p style={{ color: "var(--cs-muted)", fontSize: 14.5, marginTop: 14 }}>
-                Two quick frames are taken to check a real person is here. A reference frame is stored encrypted on your account. It is never shown back and never sent to an AI model.
-              </p>
-              <div className="cs-actions">
-                <button className="cs-btn ghost" type="button" onClick={() => { retake(); setStep(1); }}>Back</button>
-                {still ? (
-                  <>
-                    <button className="cs-btn ghost" type="button" onClick={retake}>Retake</button>
-                    <button className="cs-btn primary" type="button" onClick={() => setStep(3)}>Use this scan</button>
-                  </>
-                ) : (
-                  <button className="cs-btn primary" type="button" onClick={scan} disabled={capturing || !!cameraError}>{capturing ? "Scanning" : "Scan my face"}</button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <form className="cs-form" onSubmit={create}>
+            <form className="cs-form" onSubmit={toScan}>
               {error && <div className="cs-error" role="alert">{error}</div>}
               <div className="cs-field">
                 <label htmlFor="p">Password</label>
@@ -207,10 +150,27 @@ export default function Register() {
                 After this you log in with your username, which is your full name as you entered it, and this password.
               </p>
               <div className="cs-actions">
-                <button className="cs-btn ghost" type="button" onClick={() => setStep(2)}>Back</button>
-                <button className="cs-btn primary" type="submit" disabled={busy}>{busy ? "Creating" : "Create my account"}</button>
+                <button className="cs-btn ghost" type="button" onClick={() => setStep(1)}>Back</button>
+                <button className="cs-btn primary" type="submit">Continue</button>
               </div>
             </form>
+          )}
+
+          {step === 3 && (
+            <div className="cs-form">
+              {error && <div className="cs-error" role="alert">{error}</div>}
+              <p style={{ color: "var(--cs-muted)", fontSize: 14.5, margin: "0 0 14px" }}>
+                A short live scan. We check that a real person is here, then keep your face, encrypted, so we can check it is you later. It is never shown back and never sent to an AI model. Good light on your face helps.
+              </p>
+              {challenge ? (
+                <FaceCapture challenge={challenge} busy={busy} hints={hints} onCapture={create} label="Start face scan" />
+              ) : (
+                <p className="cs-empty">Getting your instructions</p>
+              )}
+              <div className="cs-actions">
+                <button className="cs-btn ghost" type="button" onClick={() => setStep(2)} disabled={busy}>Back</button>
+              </div>
+            </div>
           )}
         </div>
       </main>
