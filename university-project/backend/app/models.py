@@ -34,6 +34,15 @@ class User(Base):
     restricted_actions: Mapped[list | None] = mapped_column(JSON, nullable=True)
     restricted_reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
     security: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Customer record held by the bank, and what the customer set up when they registered in the app.
+    nic: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    balance_lkr: Mapped[int] = mapped_column(Integer, default=0)
+    registered: Mapped[bool] = mapped_column(Boolean, default=False)
+    registered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    face_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    face_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
