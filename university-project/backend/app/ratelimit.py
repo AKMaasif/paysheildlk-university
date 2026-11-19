@@ -21,6 +21,10 @@ LIMITS: dict[str, tuple[int, int]] = {
     "verify": (12, 10 * 60),
     "liveness": (8, 10 * 60),
     "refresh": (60, 15 * 60),
+    # Registration: tries per client address, and failed matches per account number.
+    "register_ip": (12, 15 * 60),
+    "register_fail": (6, 15 * 60),
+    "pw_change": (6, 15 * 60),
 }
 
 _lock = threading.Lock()
