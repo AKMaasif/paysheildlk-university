@@ -82,7 +82,7 @@ export default function CaseDetailPage() {
         <div className="card">
           <h2>Factors</h2>
           {(item.risk_factors || []).map((factor) => (
-            <div key={factor.label} className="factor-line"><span>{factor.label}</span><span>+{factor.points}</span></div>
+            <div key={factor.label} className="factor-line"><span>{factor.label}</span><span>{factor.points >= 0 ? "+" : "\u2212"}{Math.abs(factor.points)}</span></div>
           ))}
           {data.report && (
             <div className="row-actions">
