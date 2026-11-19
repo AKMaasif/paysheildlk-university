@@ -14,6 +14,9 @@ class Signals:
     new_device_login: bool = False
     latest_sim_change: str | None = None
     swapped: bool = False
+    # From the customer's own ledger (app/profile.py). Both stay False when there is too little history.
+    familiar_payment: bool = False
+    unusual_amount: bool = False
 
 
 @dataclass
@@ -22,6 +25,29 @@ class PolicyResult:
     score: int
     factors: list = field(default_factory=list)
     reason: str = ""
+
+
+# Numbers an analyst may tune. The defaults are the original rule table. Each has hard limits that no
+# proposal and no approval can go outside. Everything else in decide_policy is fixed.
+DEFAULTS = {"hold_score": 45}
+SAFE_RANGE = {"hold_score": (35, 70)}
+_thresholds = dict(DEFAULTS)
+
+
+def thresholds() -> dict:
+    return dict(_thresholds)
+
+
+def set_threshold(key: str, value: int) -> None:
+    low, high = SAFE_RANGE[key]
+    if not low <= int(value) <= high:
+        raise ValueError(f"{key} must stay between {low} and {high}")
+    _thresholds[key] = int(value)
+
+
+def reset_thresholds() -> None:
+    _thresholds.clear()
+    _thresholds.update(DEFAULTS)
 
 
 def compute_risk_score(signals: Signals) -> tuple[int, list[dict]]:
@@ -63,7 +89,11 @@ def compute_risk_score(signals: Signals) -> tuple[int, list[dict]]:
         add(15, "password_reset", "Password reset in the last 12 hours")
     if signals.new_device_login:
         add(10, "new_device_login", "Sign-in from a device not seen on this account")
-    return min(score, 100), factors
+    if signals.unusual_amount:
+        add(10, "unusual_amount", "Amount is more than twice this customer's usual high, shortly after a SIM change")
+    if signals.familiar_payment:
+        add(-25, "familiar_payment", "Established payee and a usual amount for this customer")
+    return max(0, min(score, 100)), factors
 
 
 def decide_policy(signals: Signals) -> PolicyResult:
@@ -96,7 +126,7 @@ def decide_policy(signals: Signals) -> PolicyResult:
             and signals.password_reset_age_hours <= 12
         )
     )
-    if score >= 45 or correlated:
+    if score >= _thresholds["hold_score"] or correlated:
         return PolicyResult(
             decision="hold",
             score=score,
