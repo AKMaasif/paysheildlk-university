@@ -11,6 +11,7 @@ def boot(tmp_path, monkeypatch):
     monkeypatch.setenv("REDIS_URL", "")
     monkeypatch.setenv("JWT_SECRET", "test-secret-not-for-production-use")
     monkeypatch.setenv("STEP_DELAY_MS", "0")
+    monkeypatch.setenv("FACE_ENGINE", "legacy")
     monkeypatch.setenv("DEMO_ASSIST", "true")
     monkeypatch.setenv("GEMINI_API_KEY", "")
     monkeypatch.setenv("META_API_KEY", "")
