@@ -1,12 +1,7 @@
-import base64
-import io
 from datetime import timedelta
-
-import qrcode
 
 from app.db import session_scope
 from app.models import Case, CaseEvent, Notification, Report, SimEvent, Transaction, User
-from app.security import open_totp, seconds_left_in_totp_window, totp_now, totp_uri
 from app.seed import CUSTOMERS, PILOT_ANSWERS
 from app.util import nid, utcnow
 
@@ -37,7 +32,7 @@ def trigger(customer_id: str, scenario: str) -> str:
             session.add(_tx(user.id, "new_payee", 0, "K.D. Enterprises", True, now - timedelta(minutes=12), "completed", None, {}))
             tx = _tx(user.id, "transfer", 200_000, "K.D. Enterprises", True, now, "pending", case_id, {"payee_account": "20938411"})
             tx.id = tx_id
-            tx.payee_bank = "Sampath Bank"
+            tx.payee_bank = "BankCylone"
             tx.payee_account = "20938411"
             amount, payee = 200_000, "K.D. Enterprises"
         elif scenario == "port_out_critical":
@@ -47,7 +42,7 @@ def trigger(customer_id: str, scenario: str) -> str:
             session.add(_tx(user.id, "new_payee", 0, "A.R. Imports", True, now - timedelta(minutes=20), "completed", None, {}))
             tx = _tx(user.id, "transfer", 800_000, "A.R. Imports", True, now, "pending", case_id, {})
             tx.id = tx_id
-            tx.payee_bank = "HNB"
+            tx.payee_bank = "BankCylone"
             amount, payee = 800_000, "A.R. Imports"
         elif scenario == "large_payment":
             # No SIM signal and no new payee: the normal rules release this. Emergency mode is what holds it.
@@ -139,6 +134,7 @@ def reset_demo() -> dict:
 
 
 def assist(customer_id: str) -> dict:
+    """What a presenter types into the registration form, and the answers to the security questions."""
     from app.runtime import runtime
 
     if not runtime.settings.demo_assist:
@@ -147,30 +143,43 @@ def assist(customer_id: str) -> dict:
         user = session.get(User, customer_id)
         if user is None or user.role != "customer":
             raise LookupError(customer_id)
-        secret = open_totp(user.totp_secret)
-        email = user.email
-        enrolled = user.totp_enrolled
-    uri = totp_uri(secret, email) if secret else ""
-    image = ""
-    if uri:
-        img = qrcode.make(uri)
-        buffer = io.BytesIO()
-        img.save(buffer, format="PNG")
-        image = base64.b64encode(buffer.getvalue()).decode()
-    profile = next(row for row in CUSTOMERS if row["id"] == customer_id)
+        record = {
+            "customer_id": customer_id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "nic": user.nic,
+            "phone": user.phone,
+            "account_number": user.account_number,
+            "bank": user.bank,
+            "registered": bool(user.registered),
+            "username": user.username,
+        }
     return {
-        "customer_id": customer_id,
-        "email": email,
-        "password_hint": profile["password"],
-        "totp_code": totp_now(secret) if secret else None,
-        "seconds_remaining": seconds_left_in_totp_window(),
-        "totp_secret": secret,
-        "otpauth_uri": uri,
-        "qr_png_base64": image,
-        "enrolled": enrolled,
+        **record,
         "answers": PILOT_ANSWERS.get(customer_id, {}),
-        "note": "Fictional customer. These values exist so a judge can finish the authenticator step.",
+        "note": "Fictional customer. Type these details into the registration form. The face scan uses the phone camera.",
     }
+
+
+def unregister(customer_id: str) -> bool:
+    """Put a customer back to the first-time state so the registration can be shown again."""
+    import secrets
+
+    from app.security import hash_password
+
+    with session_scope() as session:
+        user = session.get(User, customer_id)
+        if user is None or user.role != "customer":
+            return False
+        user.registered = False
+        user.registered_at = None
+        user.username = None
+        user.face_ref = None
+        user.face_hash = None
+        user.must_change_password = False
+        user.password_changed_at = None
+        user.password_hash = hash_password(secrets.token_urlsafe(24))
+        return True
 
 
 def list_customers() -> list[dict]:
@@ -186,6 +195,7 @@ def list_customers() -> list[dict]:
                 "province": row.province,
                 "district": row.district,
                 "restricted": row.restricted,
+                "registered": bool(row.registered),
             }
             for row in rows
         ]
