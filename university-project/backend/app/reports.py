@@ -17,7 +17,7 @@ def render_report(case: Case, user: User, tx: Transaction | None, events: list[C
         "waiting_verification": "Waiting for security answers",
     }.get(case.status, case.status)
     factors = case.risk_factors or []
-    factor_lines = "\n".join(f"- {item.get('label')} (+{item.get('points')})" for item in factors) or "- None recorded"
+    factor_lines = "\n".join(f"- {item.get('label')} ({'+' if (item.get('points') or 0) >= 0 else '-'}{abs(item.get('points') or 0)})" for item in factors) or "- None recorded"
     counts = case.provider_counts or {}
     if counts:
         served = ", ".join(f"{name} {count}" for name, count in sorted(counts.items()))
