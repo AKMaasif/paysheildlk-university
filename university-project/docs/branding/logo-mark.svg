@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 130" width="512" height="520" role="img" aria-label="PayShield.lk"><defs><linearGradient id="g" x1="16" y1="8" x2="112" y2="122" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0f6b6b"/><stop offset="1" stop-color="#093f45"/></linearGradient></defs>
+<path d="M30 8 H112 V62 C112 90 92 112 64 122 C36 112 16 90 16 62 V22 Z" fill="url(#g)"/>
+<g fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+<rect x="38" y="36" width="52" height="48" rx="9"/><path d="M38 52H90M38 68H90M64 36V52M64 68V84"/></g>
+<path d="M45 64 L58 77 L84 47" fill="none" stroke="#6ff2d6" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>
