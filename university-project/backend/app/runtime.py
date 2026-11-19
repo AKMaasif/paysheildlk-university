@@ -138,6 +138,8 @@ def _ensure_columns(engine) -> None:
         "cases": {
             "liveness_strikes": "INTEGER DEFAULT 0",
             "knowledge_round": "INTEGER DEFAULT 0",
+            "face_score": "FLOAT",
+            "face_verdict": "VARCHAR(20)",
         },
         "case_events": {"fallback_from": "VARCHAR(40)"},
         "reports": {"sha256": "VARCHAR(64)"},
@@ -201,6 +203,9 @@ def init_runtime() -> None:
     with session_scope() as session:
         created = seed(session, settings)
         upgrade_existing(session)
+        from app.calibration import load_thresholds
+
+        load_thresholds(session)
         # Databases made by an older build get the current simulated book in place.
         rebuilt = refresh_simulated_book(session, utcnow())
     if created:
