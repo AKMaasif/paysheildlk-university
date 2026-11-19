@@ -16,6 +16,7 @@ and the SHA-256 stored on the report row can be re-checked on download.
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -31,6 +32,7 @@ MUTED = (96, 108, 114)
 RULE = (214, 220, 222)
 SOFT = (241, 245, 245)
 TEAL = (21, 111, 107)
+LOGO = Path(__file__).with_name("assets") / "logo.png"
 TEAL_SOFT = (214, 236, 234)
 OUTCOME = {
     "closed_blocked": ((176, 36, 36), (251, 233, 233), "PAYMENT BLOCKED"),
@@ -369,10 +371,8 @@ def build_case_pdf(case_id: str, audience: str = "analyst") -> bytes:
     doc.add_page()
 
     # Title block
-    doc.set_y(12)
-    doc.set_font("Helvetica", "B", 9)
-    doc.set_text_color(*TEAL)
-    doc.cell(0, 5, "PAYSHIELD.LK", new_x="LMARGIN", new_y="NEXT")
+    doc.image(str(LOGO), x=16, y=11, h=10)
+    doc.set_y(24)
     doc.set_font("Helvetica", "B", 19)
     doc.set_text_color(*INK)
     doc.cell(0, 9, title, new_x="LMARGIN", new_y="NEXT")
