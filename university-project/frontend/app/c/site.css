@@ -337,3 +337,6 @@
 
 /* ".lk" needs a lighter teal on the dark bars */
 .cs-appbar .cs-brand strong span, .cs-auth-side .cs-brand strong span, .cs-foot .cs-brand strong span { color: var(--cs-mint); }
+
+.cs-hints { margin: 12px 0 0; padding: 12px 14px 12px 30px; background: var(--cs-amber-wash); color: #6d4600; border: 1px solid #ecd9a8; border-radius: 8px; font-size: 14.5px; }
+.cs-hints li { margin: 3px 0; }
