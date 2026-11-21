@@ -2,7 +2,6 @@
 familiar behaviour and raises it for an unusually large amount after a SIM change, and never touches the
 critical block rule or the swap-plus-warning hold rule."""
 import random
-from datetime import timedelta
 
 from app.db import session_scope
 from app.facts import collect_signals
