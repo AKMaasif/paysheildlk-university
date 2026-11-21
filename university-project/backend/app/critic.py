@@ -48,7 +48,6 @@ def _numbers(text: str) -> set[str]:
 def check(agent: str, text: str, facts: str) -> Verdict:
     problems: list[str] = []
     note = text or ""
-    low = note.lower()
     facts_low = (facts or "").lower()
     if not note.strip():
         problems.append("the note is empty")
