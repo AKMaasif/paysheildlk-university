@@ -76,7 +76,8 @@ class BadCapture(ValueError):
 
 
 def similarity(distance: float) -> float:
-    return round(100.0 / (1.0 + math.exp((distance - CENTRE) / WIDTH)), 1)
+    exponent = max(-60.0, min(60.0, (distance - CENTRE) / WIDTH))  # beyond this the score is already 0 or 100, and exp() would overflow
+    return round(100.0 / (1.0 + math.exp(exponent)), 1)
 
 
 def tier(score: float) -> str:
@@ -113,7 +114,9 @@ class Observation:
         p = self.landmarks
         if not p:
             return None
-        d = lambda i, j: math.dist(p[a + i], p[a + j])
+        def d(i: int, j: int) -> float:
+            return math.dist(p[a + i], p[a + j])
+
         horizontal = d(0, 3)
         return None if horizontal == 0 else (d(1, 5) + d(2, 4)) / (2 * horizontal)
 
@@ -285,7 +288,7 @@ def redeem_challenge(token: str, binding: str) -> list[str]:
 
 
 def _satisfied(step: str, obs: list[Observation], times: list[float], lo: float, hi: float) -> bool:
-    window = [(o, t) for o, t in zip(obs, times) if lo <= t <= hi and o.faces == 1]
+    window = [(o, t) for o, t in zip(obs, times, strict=False) if lo <= t <= hi and o.faces == 1]
     if len(window) < 2:
         return False
     if step in {"turn_left", "turn_right"}:
@@ -327,7 +330,7 @@ def _decode(frames: list, offsets_ms: list | None) -> tuple[list[bytes], list[fl
     if sum(len(j) for j in jpegs) > MAX_TOTAL_BYTES:
         raise BadCapture("the capture is too large")
     offsets = [float(o) / 1000.0 for o in (offsets_ms or [])]
-    if len(offsets) != len(jpegs) or any(b < a for a, b in zip(offsets, offsets[1:])):
+    if len(offsets) != len(jpegs) or any(b < a for a, b in zip(offsets, offsets[1:], strict=False)):
         raise BadCapture("frame times are missing or out of order")
     return jpegs, offsets
 
@@ -426,7 +429,7 @@ def _moves(present: list[Observation]) -> bool:
 
 
 def _distance(a, b) -> float:
-    return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
+    return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b, strict=False)))
 
 
 # ---------------------------------------------------------------- templates (what is stored for a customer)
@@ -448,7 +451,12 @@ def load_templates(blob: str | None) -> dict | None:
 
     if not blob:
         return None
-    plain = decrypt(blob, runtime.settings.encryption_key)
+    try:
+        plain = decrypt(blob, runtime.settings.encryption_key)
+    except Exception:
+        # A corrupt or tampered record is the same as no record: the caller falls back to the security questions.
+        log.warning("stored face data could not be decrypted")
+        return None
     if not plain:
         return None
     try:
@@ -487,7 +495,7 @@ def enroll(frames, offsets_ms, token: str | None) -> dict:
     live = check_liveness(cap, steps)
     if not live["live"]:
         return {"ok": False, "reason": "not_live", "hints": live["reasons"], "liveness": live}
-    good = sorted([(o, j) for o, j in zip(cap.obs, cap.jpegs) if _identity_grade(o)], key=lambda p: -_quality_score(p[0]))
+    good = sorted([(o, j) for o, j in zip(cap.obs, cap.jpegs, strict=False) if _identity_grade(o)], key=lambda p: -_quality_score(p[0]))
     if len(good) < 3:
         hints = []
         for o in cap.obs:
