@@ -1,3 +1,4 @@
+import contextvars
 import json
 import logging
 import threading
@@ -8,6 +9,16 @@ from app.models import Case, CaseEvent
 from app.util import iso, nid, utcnow
 
 log = logging.getLogger("payshield.events")
+
+# One id for each run of the workflow on a case (the first run, then each resume, reminder or escalation). Every event
+# written during that run carries it, so a presenter can pull out exactly what one run did.
+run_id: contextvars.ContextVar[str | None] = contextvars.ContextVar("payshield_run_id", default=None)
+
+
+def start_run(prefix: str = "run") -> str:
+    value = nid(prefix)
+    run_id.set(value)
+    return value
 
 
 class EventBus:
@@ -73,7 +84,7 @@ class EventBus:
                 queue.get_nowait()
                 queue.put_nowait(payload)
             except Exception:
-                pass
+                log.debug("a live-event subscriber is gone; the event is dropped for it")
 
 
 def emit(
@@ -92,7 +103,12 @@ def emit(
     fallback_from: str | None = None,
     latency_ms: int | None = None,
     message: str | None = None,
+    phase: str | None = None,
+    call_id: str | None = None,
+    result: dict | None = None,
+    meta: dict | None = None,
 ) -> dict:
+    from app.privacy import redact
     from app.runtime import runtime
 
     event_id = nid("evt")
@@ -101,6 +117,9 @@ def emit(
         case = session.get(Case, case_id)
         customer_id = case.customer_id if case else None
         bank = case.bank if case else None
+        # Identifiers that tie one event to the rest of the case, added to whatever the caller says.
+        meta = {**(meta or {}), "case_id": case_id, "transaction_id": case.transaction_id if case else None, "run_id": run_id.get()}
+        result = redact(result) if result is not None else None
         row = CaseEvent(
             id=event_id,
             case_id=case_id,
@@ -118,6 +137,10 @@ def emit(
             latency_ms=latency_ms,
             message=message,
             created_at=created,
+            phase=phase,
+            call_id=call_id,
+            result=result,
+            meta=meta,
         )
         session.add(row)
         session.flush()
@@ -140,6 +163,10 @@ def emit(
             "latency_ms": latency_ms,
             "message": message,
             "created_at": iso(created),
+            "phase": phase,
+            "call_id": call_id,
+            "result": result,
+            "meta": meta,
         }
     runtime.bus.publish_live(payload)
     client = runtime.redis
@@ -173,4 +200,8 @@ def event_dict(row: CaseEvent, customer_id: str | None = None, bank: str | None 
         "latency_ms": row.latency_ms,
         "message": row.message,
         "created_at": iso(row.created_at),
+        "phase": row.phase,
+        "call_id": row.call_id,
+        "result": row.result,
+        "meta": row.meta,
     }
