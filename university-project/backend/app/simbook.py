@@ -46,7 +46,7 @@ def refresh(session, now) -> bool:
 
 
 def build(now) -> list[Transaction]:
-    rng = random.Random(2611)
+    rng = random.Random(2611)  # noqa: S311 - a fixed seed, so the simulated book is the same every time; not a security use
     names = list(DISTRICTS)
     weights = [DISTRICTS[name][1] for name in names]
     multiplier = {
