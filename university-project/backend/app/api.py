@@ -1,12 +1,28 @@
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
-from app.agents.runner import escalate_case, process_timeouts, realert_case, resume_case, spawn_case
+from app import ratelimit
+from app.agents.runner import (
+    escalate_case,
+    process_timeouts,
+    realert_case,
+    resume_case,
+    spawn_case,
+)
 from app.db import session_scope
 from app.events import event_dict
 from app.facts import InvalidPhone, UnknownPhone, check_sim_swap, retrieve_sim_swap_date
@@ -24,30 +40,27 @@ from app.models import (
     Transaction,
     User,
 )
-from app.reports import render_pdf
 from app.runtime import runtime
-from app import ratelimit
 from app.security import (
     REFRESH_MINUTES,
     create_token,
     decode_token,
     hash_password,
+    open_totp,
     password_needs_upgrade,
+    seal_totp,
     totp_uri,
     totp_valid,
-    open_totp,
-    seal_totp,
     verify_password,
 )
 from app.util import (
+    COLOMBO,
     OPERATOR_ROLES,
     ROLE_LABELS,
-    COLOMBO,
     age_phrase,
     aware,
     colombo_stamp,
     iso,
-    lkr,
     nid,
     scoped_bank,
     severity,
@@ -214,6 +227,12 @@ def require_operator(user: User = Depends(current_user)) -> User:
     return user
 
 
+def require_drills() -> None:
+    """Drills and the demonstration helpers write pretend events into a customer's record. A real deployment turns them off."""
+    if runtime.settings is None or not runtime.settings.drills_enabled:
+        raise HTTPException(status_code=404, detail="Drills are switched off on this system")
+
+
 def require_writer(user: User = Depends(require_operator)) -> User:
     if user.role == "auditor":
         raise HTTPException(status_code=403, detail="Auditors have read-only access")
@@ -260,8 +279,28 @@ def _case_passes(case: Case, user: User, bank: str | None, province: str | None,
     return True
 
 
+def _timers(case: Case) -> dict | None:
+    """Where a waiting case is on its clock: how long it has waited, when the reminder is due, when it goes to a person."""
+    if case.status not in {"waiting_customer", "waiting_liveness", "waiting_verification"} or case.waiting_since is None:
+        return None
+    settings = runtime.settings
+    waited = max(0, int((utcnow() - aware(case.waiting_since)).total_seconds()))
+    return {
+        "phase": case.status,
+        "waiting_since": iso(case.waiting_since),
+        "waited_seconds": waited,
+        "reminders_sent": max(0, (case.alert_count or 1) - 1),
+        "reminder_after_seconds": settings.realert_seconds,
+        "escalates_after_seconds": settings.escalate_seconds,
+        "seconds_to_reminder": max(0, settings.realert_seconds - waited) if (case.alert_count or 1) <= 1 else None,
+        "seconds_to_escalation": max(0, settings.escalate_seconds - waited),
+        "escalation_at": iso(aware(case.waiting_since) + timedelta(seconds=settings.escalate_seconds)),
+    }
+
+
 def _case_brief(case: Case, customer: User | None) -> dict:
     return {
+        "timers": _timers(case),
         "id": case.id,
         "customer_id": case.customer_id,
         "customer_name": customer.full_name if customer else "",
@@ -306,7 +345,7 @@ def _customer_steps(case: Case) -> list[str]:
         freeze = case.sim_freeze_ref or "pending"
         return [
             "The transfer is blocked.",
-            f"We asked the operator to freeze the SIM. Reference {freeze}.",
+            f"We recorded a SIM freeze request, reference {freeze}. Your mobile operator has not been told, so call them to freeze the SIM.",
             "Transfers, new payees, password resets, and port-out stay locked until your bank's fraud desk clears them.",
             "Call your bank on the number printed on your card. Do not use a number from a text message.",
             "This app stays on the phone you registered. It is not tied to the SIM.",
@@ -368,6 +407,18 @@ def health():
         "realert_seconds": settings.realert_seconds if settings else 180,
         "escalate_seconds": settings.escalate_seconds if settings else 600,
         "jwt_dev_secret": bool(settings and settings.jwt_is_dev_default),
+        # What the presenter needs to say truthfully about this run. Counts only: no address, number or key is shown.
+        "mode": settings.demo_mode if settings else "deterministic",
+        "mode_note": settings.mode_note if settings else "",
+        "ignored_by_mode": list(settings.ignored_by_mode) if settings else [],
+        "recipients_cleared": {"phones": len(settings.demo_allowed_phones), "emails": len(settings.demo_allowed_emails)} if settings else {},
+        "real_actions": {
+            "bank_ledger": "synthetic",
+            "sim_freeze": "simulated request, no operator integration",
+            "sim_swap_data": "operator gateway" if settings and settings.telco_base_url else "synthetic",
+            "sms": "real provider" if settings and settings.sms_driver == "textlk" else "logged only",
+            "email": "real provider" if settings and settings.email_driver == "smtp" else "logged only",
+        },
     }
 
 
@@ -558,7 +609,6 @@ def overview(
     risk: str | None = None,
 ):
     cases, users = _selected_cases(user, bank, province, risk)
-    held = [case for case in cases if case.status in {"waiting_customer", "waiting_verification", "escalated", "open"} and case.policy_decision in {"hold", "block"}]
     # Open holds are transactions still held. Recompute from the ledger so a released case drops out.
     with session_scope() as session:
         tx_rows = session.query(Transaction).filter(Transaction.status == "held").all()
@@ -881,9 +931,13 @@ def override(transaction_id: str, body: OverrideIn, user: User = Depends(require
         if user.role == "bank_supervisor" and user.bank and customer.bank != user.bank:
             raise HTTPException(status_code=403, detail="That payment is outside your bank")
         case = session.get(Case, tx.case_id) if tx.case_id else None
+        tx_customer = tx.customer_id
         detail = dict(tx.detail or {})
         detail["override"] = {"by": user.email, "action": body.action, "reason": body.reason.strip()}
         tx.detail = detail
+        if body.action == "release" and tx.kind == "transfer":
+            # The same rule as ledger.release_transaction: the money leaves the account when the payment is released, once.
+            customer.balance_lkr = max(0, int(customer.balance_lkr or 0) - int(tx.amount_lkr or 0))
         tx.status = "released" if body.action == "release" else "blocked"
         case_id = case.id if case else None
         if case is not None:
@@ -907,6 +961,20 @@ def override(transaction_id: str, body: OverrideIn, user: User = Depends(require
             provider="rules",
             model="deterministic",
         )
+        # The case is closed, so the customer is told and the same record is left as for any other outcome.
+        from app.agents import tools
+
+        released = body.action == "release"
+        tools.outcome_notice(
+            tx_customer,
+            case_id,
+            "Payment released" if released else "Payment blocked",
+            "After a check by the bank's fraud desk your payment was released." if released
+            else "The bank's fraud desk blocked this transfer and no money left your account. Call your bank on the number printed on your card.",
+        )
+        tools.review_notes(case_id)
+        tools.generate_report(case_id)
+        tools.deliver_report(case_id)
     return {"ok": True, "status": "released" if body.action == "release" else "blocked"}
 
 
@@ -927,6 +995,8 @@ def map_data(
         by_customer.setdefault(case.customer_id, []).append(case)
     points = []
     for customer in customers:
+        if customer.lat is None or customer.lng is None:
+            continue  # a customer with no known position cannot be drawn
         if forced and customer.bank != forced:
             continue
         if province and province not in {"", "all"} and customer.province != province:
@@ -980,7 +1050,7 @@ def agents(user: User = Depends(require_operator)):
     configured = settings.gemini_model if settings.gemini_api_key else ("meta:" + settings.meta_model if settings.meta_api_key else "mock-deterministic")
     fallback = settings.meta_model if settings.meta_api_key else "mock-deterministic"
     with session_scope() as session:
-        rows = session.query(CaseEvent).all()
+        rows = session.query(CaseEvent).filter(CaseEvent.phase.is_distinct_from("started")).all()  # a start marker is not a finished call
     grouped: dict[str, list[CaseEvent]] = {}
     for row in rows:
         grouped.setdefault(row.agent, []).append(row)
@@ -1241,7 +1311,7 @@ def settings_view(user: User = Depends(require_operator)):
     return body
 
 
-@router.post("/api/demo/trigger")
+@router.post("/api/demo/trigger", dependencies=[Depends(require_drills)])
 def demo_trigger(body: DemoIn, user: User = Depends(require_writer)):
     from app.demo import trigger
 
@@ -1260,7 +1330,27 @@ class UnregisterIn(BaseModel):
     customer_id: str
 
 
-@router.post("/api/demo/unregister")
+class SimEventIn(BaseModel):
+    phone: str
+    event_type: str
+    occurred_at: datetime | None = None
+    cancelled: bool = False
+    event_id: str | None = Field(default=None, max_length=60)
+    source: str = Field(default="injected", max_length=20)
+
+
+@router.post("/api/sim-events", dependencies=[Depends(require_drills)])
+def inject_sim_event(body: SimEventIn, user: User = Depends(require_writer)):
+    from app.ingest import ingest
+
+    result = ingest(body.phone, body.event_type, body.occurred_at or utcnow(), {"cancelled": True} if body.cancelled else {}, body.source, body.event_id)
+    if result["status"] == "rejected":
+        raise HTTPException(status_code=422, detail=result["reason"])
+    audit(user.email, "sim_event_injected", result.get("customer_id") or "-", f"{body.event_type} {result['status']}")
+    return result
+
+
+@router.post("/api/demo/unregister", dependencies=[Depends(require_drills)])
 def demo_unregister(body: UnregisterIn, user: User = Depends(require_writer)):
     from app.demo import unregister
 
@@ -1270,7 +1360,7 @@ def demo_unregister(body: UnregisterIn, user: User = Depends(require_writer)):
     return {"ok": True}
 
 
-@router.post("/api/demo/reset")
+@router.post("/api/demo/reset", dependencies=[Depends(require_drills)])
 def demo_reset(user: User = Depends(require_writer)):
     from app.demo import reset_demo
 
@@ -1279,7 +1369,7 @@ def demo_reset(user: User = Depends(require_writer)):
     return result
 
 
-@router.get("/api/demo/assist")
+@router.get("/api/demo/assist", dependencies=[Depends(require_drills)])
 def demo_assist(customer_id: str, user: User = Depends(require_operator)):
     from app.demo import assist
 
@@ -1291,7 +1381,7 @@ def demo_assist(customer_id: str, user: User = Depends(require_operator)):
         raise HTTPException(status_code=404, detail="Unknown customer") from exc
 
 
-@router.get("/api/demo/customers")
+@router.get("/api/demo/customers", dependencies=[Depends(require_drills)])
 def demo_customers(user: User = Depends(require_operator)):
     from app.demo import list_customers
 
@@ -1485,6 +1575,9 @@ def customer_respond(case_id: str, body: RespondIn, user: User = Depends(require
         case = session.get(Case, case_id)
         if case is None or case.customer_id != user.id:
             raise HTTPException(status_code=404, detail="Case not found")
+        if case.status != "waiting_customer":
+            # A late answer is refused before it is written anywhere, so it cannot appear in the case's record.
+            raise HTTPException(status_code=409, detail="This payment is no longer waiting for that answer")
     from app.events import emit
 
     emit(
@@ -1568,14 +1661,20 @@ async def stream(websocket: WebSocket):
             return
         role, user_id, bank = user.role, user.id, user.bank
     queue = runtime.bus.subscribe()
+    closed = asyncio.ensure_future(_until_closed(websocket))
     try:
         await websocket.send_json({"type": "snapshot", "events": _snapshot(role, user_id, bank)})
         while True:
-            try:
-                event = await asyncio.wait_for(queue.get(), timeout=20)
-            except asyncio.TimeoutError:
+            getter = asyncio.ensure_future(queue.get())
+            done, _pending = await asyncio.wait({getter, closed}, timeout=20, return_when=asyncio.FIRST_COMPLETED)
+            if closed in done:
+                getter.cancel()
+                break  # the client left: stop at once rather than at the next ping
+            if getter not in done:
+                getter.cancel()
                 await websocket.send_json({"type": "ping"})
                 continue
+            event = getter.result()
             if not _visible(role, user_id, bank, event):
                 continue
             await websocket.send_json({"type": "event", "event": event})
@@ -1584,7 +1683,16 @@ async def stream(websocket: WebSocket):
     except Exception:
         log.info("websocket closed")
     finally:
+        closed.cancel()
         runtime.bus.unsubscribe(queue)
+
+
+async def _until_closed(websocket: WebSocket) -> None:
+    """Returns when the client disconnects. Anything the client sends is read and ignored."""
+    while True:
+        message = await websocket.receive()
+        if message["type"] == "websocket.disconnect":
+            return
 
 
 # Imported for tests that want to drive the sweeper without the HTTP layer.
