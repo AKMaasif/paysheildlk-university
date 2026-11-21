@@ -82,9 +82,9 @@ def test_pdf_has_a_stable_fingerprint_field():
 
 
 def test_audit_chain_detects_a_tampered_row(boot):
+    from app.db import session_scope
     from app.ledger import audit, verify_audit_chain
     from app.models import AuditLog
-    from app.db import session_scope
 
     audit("desk@payshield.lk", "unit", "case", "first")
     audit("desk@payshield.lk", "unit", "case", "second")
