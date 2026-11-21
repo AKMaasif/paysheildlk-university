@@ -14,7 +14,6 @@ release.
 """
 
 from app.charters import enforce
-from app.db import session_scope
 from app.models import Case, PolicyProposal, PolicySetting
 from app.risk import DEFAULTS, SAFE_RANGE, set_threshold, thresholds
 from app.util import iso, nid, utcnow
@@ -115,6 +114,7 @@ def decide(session, proposal_id: str, approve: bool, actor_email: str, note: str
     if approve:
         if row.current != thresholds()["hold_score"]:
             row.status = "superseded"
+            session.commit()  # keep this even though the caller is about to see an error and roll back
             raise ValueError("The hold score has changed since this was proposed. Ask for a fresh proposal.")
         set_threshold(row.key, row.proposed)  # raises if outside the hard limits
         setting = session.get(PolicySetting, row.key)
