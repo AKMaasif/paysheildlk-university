@@ -1,9 +1,10 @@
 import logging
 import threading
 
+from app import ops
 from app.agents.graph import invoke_initial, invoke_resume
 from app.db import session_scope
-from app.events import emit
+from app.events import emit, start_run
 from app.ledger import set_case_fields
 from app.models import Case, Transaction, User
 from app.notify import GENERIC_SMS, send_email, send_push, send_sms
@@ -11,7 +12,7 @@ from app.util import aware, lkr, utcnow
 
 log = logging.getLogger("payshield.runner")
 
-_graph_lock = threading.Lock()
+# One lock per case: two things can never run on the same case at once, but different cases run side by side.
 _case_guards: dict[str, threading.Lock] = {}
 _guard_lock = threading.Lock()
 
@@ -29,6 +30,7 @@ def fail_safe(case_id: str, reason: str) -> str:
     A payment that is still pending is held. A payment already blocked or released
     stays that way. Anything unfinished goes to a human analyst, and the customer
     is told the payment is still on hold. Returns the case status it ended with."""
+    ops.count("fail_safe")
     with session_scope() as session:
         case = session.get(Case, case_id)
         if case is None:
@@ -75,6 +77,7 @@ def fail_safe(case_id: str, reason: str) -> str:
 
 
 def begin_case(case_id: str) -> None:
+    start_run("run")
     with case_lock(case_id):
         try:
             _begin(case_id)
@@ -98,19 +101,18 @@ def _begin(case_id: str) -> None:
         }
         case.status = "running"
         case.updated_at = utcnow()
-    with _graph_lock:
-        invoke_initial(case_id, state)
+    invoke_initial(case_id, state)
 
 
 def resume_case(case_id: str, value: dict, expect_status: str) -> bool:
+    start_run("run")
     with case_lock(case_id):
         with session_scope() as session:
             case = session.get(Case, case_id)
             if case is None or case.status != expect_status:
                 return False
         try:
-            with _graph_lock:
-                invoke_resume(case_id, value)
+            invoke_resume(case_id, value)
         except Exception as exc:
             log.exception("case %s failed on resume", case_id)
             fail_safe(case_id, f"An agent failed: {str(exc)[:160]}.")
@@ -124,6 +126,7 @@ def spawn_case(case_id: str) -> None:
 def realert_case(case_id: str) -> bool:
     from app.runtime import runtime
 
+    start_run("remind")
     with case_lock(case_id):
         with session_scope() as session:
             case = session.get(Case, case_id)
@@ -169,6 +172,7 @@ def realert_case(case_id: str) -> bool:
 
 
 def escalate_case(case_id: str) -> bool:
+    start_run("escal")
     with case_lock(case_id):
         with session_scope() as session:
             case = session.get(Case, case_id)
@@ -177,8 +181,7 @@ def escalate_case(case_id: str) -> bool:
             case.status = "escalating"
             case.updated_at = utcnow()
         try:
-            with _graph_lock:
-                invoke_resume(case_id, {"decision": "timeout"})
+            invoke_resume(case_id, {"decision": "timeout"})
         except Exception:
             log.exception("escalate failed for %s", case_id)
             set_case_fields(case_id, status="error")
@@ -231,3 +234,5 @@ def timeout_loop(stop: threading.Event, generation: int | None = None) -> None:
             process_timeouts()
         except Exception:
             log.exception("timeout sweep failed")
+            ops.count("timeout_sweep_errors")
+        ops.heartbeat()
