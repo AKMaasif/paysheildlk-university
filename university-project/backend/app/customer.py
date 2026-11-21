@@ -180,7 +180,7 @@ def register(body: RegisterIn, request: Request):
         try:
             enrolled = face.enroll(body.frames, body.offsets_ms, body.challenge)
         except (face.ChallengeError, face.BadCapture) as exc:
-            raise HTTPException(status_code=422, detail=f"The face scan was not accepted. {exc}")
+            raise HTTPException(status_code=422, detail=f"The face scan was not accepted. {exc}") from exc
         if not enrolled["ok"]:
             raise HTTPException(status_code=422, detail="The face scan was not accepted. " + " ".join(enrolled["hints"][:3]))
         sealed, face_hash = enrolled["sealed"], enrolled["hash"]
@@ -205,7 +205,7 @@ def register(body: RegisterIn, request: Request):
         user.face_ref = sealed
         session.add(
             Device(
-                id="dev_" + hashlib.sha1((user_id + str(utcnow())).encode()).hexdigest()[:10],
+                id="dev_" + hashlib.sha256((user_id + str(utcnow())).encode()).hexdigest()[:10],
                 user_id=user_id,
                 label="Registered phone",
                 platform="Browser",
