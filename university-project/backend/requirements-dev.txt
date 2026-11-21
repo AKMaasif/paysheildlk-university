@@ -1,0 +1,5 @@
+# Tools for testing and scanning. Not needed to run the service.
+pytest-cov==7.1.0
+bandit==1.9.4
+pip-audit==2.10.1
+ruff==0.17.5
