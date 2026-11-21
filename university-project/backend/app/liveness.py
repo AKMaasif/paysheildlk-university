@@ -34,7 +34,7 @@ def analyse(frames: list[bytes] | None = None, verdict: str | None = None) -> di
     if len(first) < 800 or len(second) < 800:
         reasons.append("the capture is too small for a face")
     # A printed photo or a screen grab tends to share long identical runs.
-    same = sum(1 for a, b in zip(first[:4000], second[:4000]) if a == b)
+    same = sum(1 for a, b in zip(first[:4000], second[:4000], strict=False) if a == b)
     ratio = same / max(1, min(len(first), len(second), 4000))
     if ratio > 0.98:
         reasons.append("almost no change between the challenge frames")
