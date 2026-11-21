@@ -78,7 +78,7 @@ def _mock_text(purpose: str, user: str) -> str:
         )
     if purpose == "response":
         return (
-            "The protective actions are a block on the transfer, a SIM freeze request to the operator, "
+            "The protective actions are a block on the transfer, a recorded SIM freeze request (not yet sent to the operator), "
             "and limits on the account. The case file records each one."
         )
     if purpose == "case":
