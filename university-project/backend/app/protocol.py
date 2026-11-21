@@ -1,10 +1,12 @@
 import hashlib
 import hmac
 import json
+import threading
 import time
 from dataclasses import dataclass
 
 _seen: dict[str, float] = {}
+_seen_lock = threading.Lock()  # cases run in parallel, and each one checks handoffs
 _TTL = 600
 
 
@@ -50,12 +52,12 @@ def verify_envelope(key: str, envelope: Envelope) -> None:
     if not hmac.compare_digest(expected, envelope.signature):
         raise ValueError("bad signature")
     now = time.time()
-    stale = [item for item, seen in _seen.items() if now - seen > _TTL]
-    for item in stale:
-        _seen.pop(item, None)
-    if envelope.nonce in _seen:
-        raise ValueError("replayed nonce")
-    _seen[envelope.nonce] = now
+    with _seen_lock:
+        for item in [item for item, seen in _seen.items() if now - seen > _TTL]:
+            _seen.pop(item, None)
+        if envelope.nonce in _seen:
+            raise ValueError("replayed nonce")
+        _seen[envelope.nonce] = now
 
 
 # Which graph step may hand a case to which. A message on any other route is refused.
