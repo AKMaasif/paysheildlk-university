@@ -6,11 +6,12 @@ from langgraph.errors import GraphBubbleUp
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, Send, interrupt
 
+from app import ops
 from app.agents import tools
-from app.privacy import mask, untrusted
 from app.events import emit
 from app.ledger import set_case_fields
 from app.notify import BLOCKED_SMS
+from app.privacy import mask, untrusted
 from app.util import lkr, slt_short, utcnow
 
 log = logging.getLogger("payshield.graph")
@@ -32,6 +33,7 @@ class CaseState(TypedDict, total=False):
     risk_score: int
     risk_factors: list
     risk_summary: str
+    snapshot_id: str
     policy_decision: str
     policy_reason: str
     customer_decision: str | None
@@ -113,6 +115,7 @@ def _guard(agent: str, fn):
         except Exception as exc:
             case_id = state.get("case_id", "")
             log.exception("%s failed", agent)
+            ops.count("agent_errors", agent=agent)
             try:
                 if case_id:
                     # The runner's fail-safe decides what the case becomes. The rule explanation stays as it was.
@@ -130,29 +133,79 @@ def _guard(agent: str, fn):
     return inner
 
 
-def _tool(case_id: str, agent: str, name: str, args: dict, fn):
+def _tool(case_id: str, agent: str, name: str, args: dict, fn, *, planner: str = "workflow", why: str | None = None):
+    """Run one tool. It is recorded as two events with one call id: "started" before it runs (so the dashboard can show it
+    in progress) and "finished" or "failed" after, with the real duration and the structured result. The charter is
+    checked first. planner says who chose the call: the fixed workflow, a mandatory core read, the rule planner,
+    the model planner, or a person."""
     from app.charters import enforce
+    from app.util import nid
 
     try:
         enforce(agent, name)
     except PermissionError as exc:
-        emit(case_id, agent=agent, state="error", tool_name=name, message=str(exc))
+        emit(case_id, agent=agent, state="error", tool_name=name, message=str(exc), meta={"planner": planner, "refused": "charter"})
         raise
     pace()
+    call_id = nid("call")
+    meta = {"planner": planner, **({"why": why} if why else {})}
+    emit(case_id, agent=agent, state="calling_tool", tool_name=name, tool_args=args, phase="started", call_id=call_id, meta=meta)
     started = time.perf_counter()
-    result = fn()
+    try:
+        result = fn()
+    except Exception as exc:
+        emit(
+            case_id, agent=agent, state="calling_tool", tool_name=name, tool_args=args, phase="failed", call_id=call_id,
+            latency_ms=int((time.perf_counter() - started) * 1000), message=f"{name} failed: {type(exc).__name__}",
+            result={"error": type(exc).__name__}, meta=meta,
+        )
+        raise
     latency = int((time.perf_counter() - started) * 1000)
-    summary = _summarise(name, result)
     emit(
         case_id,
         agent=agent,
         state="calling_tool",
         tool_name=name,
         tool_args=args,
-        result_summary=summary,
+        result_summary=_summarise(name, result),
         latency_ms=latency,
+        phase="finished",
+        call_id=call_id,
+        result=result if isinstance(result, dict) else {"value": result},
+        meta=meta,
     )
     return result
+
+
+_REASONS = {
+    "timeout": "the provider timed out", "unreachable": "the provider could not be reached", "rejected_credentials": "the provider refused the credentials",
+    "rate_limited": "the provider is rate limiting", "provider_error": "the provider had an error", "rejected": "the provider rejected it",
+    "no_address": "there is no email address on file", "no_phone": "there is no mobile number on file", "no_device_token": "no phone has a push token",
+    "auth_failed": "the push service refused the sign-in", "recipient_refused": "the mail server refused the recipient", "request_error": "the request could not be made",
+}
+
+
+def _delivery_text(channel: str, result: dict) -> str:
+    """One honest sentence from the structured delivery result. It says what is known and what is not."""
+    d = result.get("delivery") or {}
+    state, label = d.get("state"), {"sms": "SMS", "email": "Email", "push": "Push"}[channel]
+    tries = f" after {result['attempts']} attempts" if result.get("attempts", 1) > 1 else ""
+    if state == "logged_only":
+        return f"{label} logged only. Nothing was sent."
+    if state == "inbox_stored":
+        return f"{label} kept in the app inbox. No provider was asked."
+    if state in {"blocked_not_allowlisted", "blocked_budget"}:
+        why = "this recipient is not on the demonstration allow-list" if state == "blocked_not_allowlisted" else "the hourly limit on real messages was reached"
+        return f"{label} not sent: {why}. Kept in the app inbox."
+    if state == "provider_accepted":
+        ident = f" (id {d['provider_message_id']})" if d.get("provider_message_id") else ""
+        return f"{label} accepted by {d.get('provider')}{ident}. Delivery is not confirmed."
+    if state == "delivered":
+        return f"{label} delivery confirmed by {d.get('provider')}."
+    if state == "failed":
+        extra = " The customer is still reached in the app." if channel != "push" else ""
+        return f"{label} failed{tries}: {_REASONS.get(d.get('reason'), d.get('reason') or 'unknown reason')}.{extra}"
+    return f"{label} status unknown."
 
 
 def _summarise(name: str, result: dict) -> str:
@@ -176,19 +229,11 @@ def _summarise(name: str, result: dict) -> str:
     if name == "release_transaction":
         return f"Transaction {result.get('transaction_id')} released"
     if name == "request_sim_freeze":
-        return f"Freeze requested, reference {result.get('reference')}"
+        return f"SIM freeze request recorded in PayShield only (simulated), reference {result.get('reference')}. No operator was contacted; the SIM is not frozen."
     if name == "lock_account":
         return "Account limits applied: transfer, new payee, password reset, port-out"
-    if name == "send_push":
-        return f"Push {result.get('fcm')}, in-app {result.get('in_app')}"
-    if name == "send_email":
-        if result.get("status") == "failed":
-            return "Email failed. The customer is still reached by push and the in-app inbox."
-        return f"Email {result.get('status')} via {result.get('driver', 'in-app')}"
-    if name == "send_sms":
-        if result.get("status") == "failed":
-            return "SMS failed. The customer is still reached by push and email."
-        return f"SMS {result.get('status')} via {result.get('driver', result.get('status'))}"
+    if name in {"send_push", "send_email", "send_sms"}:
+        return _delivery_text(name.removeprefix("send_"), result)
     if name == "ask_security_questions":
         return result.get("detail") or "Answers checked"
     if name == "create_case":
@@ -296,7 +341,9 @@ def _investigate(case_id: str, agent: str, calls: dict, args: dict) -> dict:
                 provider=note["planner"],
                 model="deterministic" if note["planner"] == "rules" else "planner",
             )
-        return _tool(case_id, agent, name, tool_args, lambda: calls[name](tool_args))
+        # A core read is mandatory and is not planned. An extra one names who chose it and why.
+        planner = f"{note['planner']} planner" if note else "core read"
+        return _tool(case_id, agent, name, tool_args, lambda: calls[name](tool_args), planner=planner, why=note["why"] if note else None)
 
     out = investigate(agent, run_tool, lambda name: args[name], case_id)
     for step in out["plan"]:
@@ -347,7 +394,18 @@ def telecom(state: CaseState) -> dict:
         facts += f"sim events in 30 days: {len(history.get('events') or [])} (swaps: {history.get('swaps_30d')})\n"
     note = _note(case_id, "telecom", facts, handoff_to="risk")
     set_case_fields(case_id, telecom_summary=note["text"])
-    return {"telecom_summary": note["text"], **_send(case_id, "telecom", "risk", {"swapped": swapped})}
+    # What this agent actually saw goes to the risk step in the signed handoff, so the score uses the same observation.
+    saw = {
+        "swapped": swapped,
+        "source": swap.get("source"),
+        "sim_swap": {
+            "source": swap.get("source"),
+            "swapped": swapped == "yes",
+            "latest_sim_change": (swap.get("retrieveSimSwapDate") or {}).get("latestSimChange"),
+            "fetched_at": utcnow().isoformat(),
+        },
+    }
+    return {"telecom_summary": note["text"], **_send(case_id, "telecom", "risk", saw)}
 
 
 def banking(state: CaseState) -> dict:
@@ -396,16 +454,20 @@ def risk(state: CaseState) -> dict:
     pace()
     case_id = state["case_id"]
     # Risk needs both feeds. Each one must arrive signed.
-    _receive(state, "risk", "risk", ("telecom",))
+    _sender, from_telecom = _receive(state, "risk", "risk", ("telecom",))
     _receive(state, "risk", "risk", ("banking",))
+    telecom_saw = from_telecom.get("sim_swap")
     emit(case_id, agent="risk", state="thinking", message="Adding the telecom and bank signals.")
     scored = _tool(
         case_id,
         "risk",
         "compute_risk_score",
         {"customer_id": state["customer_id"], "transaction_id": state["transaction_id"]},
-        lambda: tools.compute_risk_score(state["customer_id"], state["transaction_id"]),
+        lambda: tools.compute_risk_score(state["customer_id"], state["transaction_id"], case_id=case_id, telecom=telecom_saw),
     )
+    if scored.get("conflicts"):
+        emit(case_id, agent="risk", state="thinking", provider="rules", model="deterministic",
+             message="Two sources disagree about the SIM: " + "; ".join(f"{c['kind'].replace('_', ' ')} (used: {c['used']})" for c in scored["conflicts"]))
     facts = f"score: {scored['score']} (capped at 100)\nfactors: {scored['factors']}\nswapped: {scored['signals']['swapped']}\n"
     note = _note(case_id, "risk", facts, handoff_to="policy")
     set_case_fields(
@@ -413,8 +475,10 @@ def risk(state: CaseState) -> dict:
         risk_score=scored["score"],
         risk_factors=scored["factors"],
         risk_summary=note["text"],
+        snapshot_id=scored["snapshot_id"],
     )
     return {
+        "snapshot_id": scored["snapshot_id"],
         "risk_score": scored["score"],
         "risk_factors": scored["factors"],
         "risk_summary": note["text"],
@@ -434,14 +498,16 @@ def policy(state: CaseState) -> dict:
         provider="rules",
         model="deterministic",
     )
-    decided = tools.apply_policy(state["customer_id"], state["transaction_id"])
+    decided = tools.apply_policy(state["customer_id"], state["transaction_id"], state.get("snapshot_id"))
     emit(
         case_id,
         agent="policy",
         state="calling_tool",
         tool_name="compute_risk_score",
-        tool_args={"customer_id": state["customer_id"], "transaction_id": state["transaction_id"]},
+        tool_args={"customer_id": state["customer_id"], "transaction_id": state["transaction_id"], "snapshot": (decided.get("snapshot") or {}).get("id")},
         result_summary=f"Rule decision {decided['decision']}. Score {decided['score']}. {decided['reason']}",
+        result={"decision": decided["decision"], "score": decided["score"], "reason": decided["reason"], "emergency": decided.get("emergency"), "snapshot": decided.get("snapshot")},
+        meta={"planner": "rules", "snapshot_id": (decided.get("snapshot") or {}).get("id")},
         provider="rules",
         model="deterministic",
     )
@@ -495,8 +561,16 @@ def alert(state: CaseState) -> dict:
     amount = state["amount_lkr"]
     payee = state["payee"]
     question = f"Did you make this payment of {lkr(amount)} to {payee}?"
+    from app.util import nid
+
+    channels = ("send_push", "send_email", "send_sms")
+    call_ids = {channel: nid("call") for channel in channels}
+    for channel in channels:  # shown as in progress for as long as the providers take
+        emit(case_id, agent="alert", state="calling_tool", tool_name=channel, tool_args={"user_id": state["customer_id"], "case_id": case_id},
+             phase="started", call_id=call_ids[channel], meta={"planner": "workflow"})
     bundle = tools.alert_customer(state["customer_id"], case_id, amount, payee)
     for channel, payload in (("send_push", bundle["push"]), ("send_email", bundle["email"]), ("send_sms", bundle["sms"])):
+        failed_send = payload.get("status") == "failed"
         emit(
             case_id,
             agent="alert",
@@ -504,6 +578,11 @@ def alert(state: CaseState) -> dict:
             tool_name=channel,
             tool_args={"user_id": state["customer_id"], "case_id": case_id},
             result_summary=_summarise(channel, payload),
+            latency_ms=payload.get("latency_ms"),
+            phase="failed" if failed_send else "finished",
+            call_id=call_ids[channel],
+            result=payload,
+            meta={"planner": "workflow", "attempts": payload.get("attempts", 1), "delivery_state": (payload.get("delivery") or {}).get("state")},
         )
     failed = [label for label, payload in (("SMS", bundle["sms"]), ("Email", bundle["email"])) if payload.get("status") == "failed"]
     if len(failed) == 2:
@@ -794,10 +873,34 @@ def release(state: CaseState) -> dict:
         if state.get("customer_decision") == "yes"
         else "Rule layer released the transfer."
     )
-    emit(case_id, agent="verification" if state.get("customer_decision") == "yes" else "policy", state="thinking", message=reason)
+    acting = "verification" if state.get("customer_decision") == "yes" else "policy"
+    emit(case_id, agent=acting, state="thinking", message=reason)
+    # The last look. The decision was made on a snapshot taken earlier, possibly minutes ago. Before money moves the
+    # signals are read again and compared. Anything materially worse stops the release and hands the case to a person.
+    look = _tool(
+        case_id,
+        acting,
+        "revalidate_before_release",
+        {"transaction_id": state["transaction_id"], "compared_with": state.get("snapshot_id")},
+        lambda: tools.revalidate_before_release(state["customer_id"], state["transaction_id"], case_id, state.get("snapshot_id"), state.get("customer_decision") == "yes"),
+    )
+    if not look["ok"]:
+        why = "; ".join(look["reasons"])
+        emit(
+            case_id, agent=acting, state="done", provider="rules", model="deterministic",
+            message=f"Release stopped. New information arrived after the decision: {why}. The payment stays held and a person has the case.",
+            handoff_from=acting, handoff_to="analyst",
+        )
+        tools.hold_transaction(state["transaction_id"], case_id)  # never left pending: the money stays frozen for the analyst
+        set_case_fields(case_id, status="escalated", pending_prompt=None)
+        tools.outcome_notice(
+            state["customer_id"], case_id, "Payment still on hold",
+            "New information arrived while your payment was being checked, so it is still held and a person on the fraud desk has the case. No money has moved.",
+        )
+        return {"final_status": "escalated", **_send(case_id, "release", "report", {"final_status": "escalated"})}
     result = _tool(
         case_id,
-        "verification" if state.get("customer_decision") == "yes" else "policy",
+        acting,
         "release_transaction",
         {"transaction_id": state["transaction_id"], "case_id": case_id},
         lambda: tools.release_transaction(state["transaction_id"], case_id, reason),
@@ -831,7 +934,7 @@ def response(state: CaseState) -> dict:
     reason = state.get("verification_detail") or state.get("policy_reason") or "Customer did not accept the payment."
     if state.get("customer_decision") == "no":
         reason = "Customer said they did not make this payment."
-    emit(case_id, agent="response", state="thinking", message="Blocking the transfer and asking the operator to freeze the SIM.")
+    emit(case_id, agent="response", state="thinking", message="Blocking the transfer and recording a SIM freeze request (simulated: no operator is contacted).")
     _tool(
         case_id,
         "response",
@@ -865,8 +968,8 @@ def response(state: CaseState) -> dict:
         state["customer_id"],
         case_id,
         "Payment blocked",
-        f"The transfer is blocked. SIM freeze reference {freeze.get('reference')}. "
-        "Call your bank on the number printed on your card.",
+        f"The transfer is blocked and no money left your account. A SIM freeze request was recorded, reference {freeze.get('reference')}, "
+        "but your mobile operator has not been told. Call your operator and your bank on the numbers printed on your SIM pack and your card.",
         sms_body=sms,
     )
     _note(case_id, "response", f"reason: {reason}\nfreeze: {freeze.get('reference')}", handoff_to="case")
@@ -915,7 +1018,7 @@ def report(state: CaseState) -> dict:
     case_id = state["case_id"]
     _receive(state, "report", "case", ("release", "response", "escalate"))
     emit(case_id, agent="case", state="thinking", message="Writing the incident report.")
-    review = _tool(case_id, "case", "review_notes", {"case_id": case_id}, lambda: tools.review_notes(case_id))
+    _tool(case_id, "case", "review_notes", {"case_id": case_id}, lambda: tools.review_notes(case_id))
     saved = _tool(case_id, "case", "generate_report", {"case_id": case_id}, lambda: tools.generate_report(case_id))
     _tool(case_id, "case", "deliver_report", {"case_id": case_id, "to": ["dashboard", "email", "sms", "push"]}, lambda: tools.deliver_report(case_id))
     _note(case_id, "case", f"report: {saved.get('report_id')}\nstatus: {state.get('final_status')}")
