@@ -56,5 +56,9 @@ def verify_secret(answer: str, stored: str, code: str = "") -> bool:
     if scheme != "pbkdf2":
         return False
     material = normalise_answer(answer, code).encode()
-    digest = hashlib.pbkdf2_hmac("sha256", material, bytes.fromhex(salt_hex), _ROUNDS)
+    try:
+        salt = bytes.fromhex(salt_hex)
+    except ValueError:
+        return False
+    digest = hashlib.pbkdf2_hmac("sha256", material, salt, _ROUNDS)
     return hmac.compare_digest(digest.hex(), digest_hex)
