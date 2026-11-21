@@ -69,6 +69,7 @@ class SimEvent(Base):
     detail: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     origin: Mapped[str] = mapped_column(String(20), default="seed")
     case_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # when this system took it in
 
 
 class Transaction(Base):
@@ -100,6 +101,7 @@ class Case(Base):
     risk_factors: Mapped[list | None] = mapped_column(JSON, nullable=True)
     policy_decision: Mapped[str | None] = mapped_column(String(20), nullable=True)
     policy_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snapshot_id: Mapped[str | None] = mapped_column(String(40), nullable=True)  # the signals the decision was made on
     telecom_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     banking_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     risk_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -146,6 +148,29 @@ class CaseEvent(Base):
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    # Tool trace. A tool call is two events with the same call_id: phase "started", then "finished" or "failed".
+    phase: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    call_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # the structured result, with secrets and identifiers redacted
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # planner, why, attempt, source, snapshot, run id, transaction id
+
+
+class DecisionSnapshot(Base):
+    """The exact signals a decision was made on, so it can be reproduced and never mistaken for later information."""
+
+    __tablename__ = "decision_snapshots"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    case_id: Mapped[str] = mapped_column(String(40), index=True)
+    purpose: Mapped[str] = mapped_column(String(20))  # score, pre_release
+    version: Mapped[int] = mapped_column(Integer, default=1)  # 1, 2, 3 ... within the case
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    signals: Mapped[dict] = mapped_column(JSON)
+    provenance: Mapped[dict] = mapped_column(JSON)  # per signal: source, observed, received, fetched, age
+    conflicts: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    digest: Mapped[str] = mapped_column(String(64))  # sha256 of the signals only: same inputs, same digest
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    decision: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 
 class Report(Base):
@@ -220,6 +245,7 @@ class Notification(Base):
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivery: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # what is actually known about getting it to the person
 
 
 class EmergencyMode(Base):
