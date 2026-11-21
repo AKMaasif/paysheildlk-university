@@ -1,6 +1,13 @@
 import logging
 
-from app.facts import collect_signals, recent_transactions, retrieve_sim_swap_date, check_sim_swap
+from app import ops
+from app.facts import (
+    check_sim_swap,
+    collect_signals,
+    read_signals,
+    recent_transactions,
+    retrieve_sim_swap_date,
+)
 from app.ledger import (
     block_transaction,
     bump_provider,
@@ -13,7 +20,6 @@ from app.ledger import (
 from app.notify import BLOCKED_SMS, GENERIC_SMS, send_email, send_push, send_sms
 from app.reports import save_report
 from app.risk import decide_policy
-from app.security import answers_match
 from app.util import lkr
 
 log = logging.getLogger("payshield.tools")
@@ -225,8 +231,13 @@ def get_recent_transactions(customer_id: str) -> dict:
     return {"customer_id": customer_id, "transactions": rows}
 
 
-def compute_risk_score(customer_id: str, transaction_id: str) -> dict:
-    signals, context = collect_signals(customer_id, transaction_id)
+def compute_risk_score(customer_id: str, transaction_id: str, case_id: str | None = None, telecom: dict | None = None) -> dict:
+    """Score the case from one stored snapshot of the signals. The snapshot is what the policy step will use too."""
+    from app import signals as signal_contract
+
+    snapshot = signal_contract.build(customer_id, transaction_id, case_id=case_id, purpose="score", telecom=telecom)
+    signals = snapshot.as_signals()
+    _s, context, _o = read_signals(customer_id, transaction_id)
     policy = decide_policy(signals)
     return {
         "score": policy.score,
@@ -253,16 +264,50 @@ def compute_risk_score(customer_id: str, transaction_id: str) -> dict:
             "amount_lkr": context["amount_lkr"],
             "transactions": context["transactions"],
         },
+        "snapshot": snapshot.describe(),
+        "snapshot_id": snapshot.id,
+        "conflicts": snapshot.conflicts,
         "decision_input_only": True,
     }
 
 
-def apply_policy(customer_id: str, transaction_id: str) -> dict:
+def policy_modifiers(customer_id: str, amount_lkr: int, *, customer_confirmed: bool = False) -> list[dict]:
+    """The live rules that can only strengthen a release into a hold: emergency mode in the customer's district, and a
+    transfer limit the fraud desk has put on the account. Read now, not from a snapshot, because they are switches a
+    person flips. A customer's own confirmation answers an emergency hold (it exists to ask them), never an account limit."""
     from app.db import session_scope
     from app.emergency import must_hold
     from app.models import User
 
-    signals, _context = collect_signals(customer_id, transaction_id)
+    found: list[dict] = []
+    with session_scope() as session:
+        user = session.get(User, customer_id)
+        district = user.district if user else None
+        limited = bool(user and user.restricted and "transfer" in (user.restricted_actions or []))
+    why = None if customer_confirmed else must_hold(district, amount_lkr)
+    if why:
+        found.append({
+            "code": "emergency", "district": district, "label": f"{district} is in emergency mode",
+            "reason": f"Emergency rule: {district} is in emergency mode ({why}). Payments of {lkr(amount_lkr)} or more are held until the customer confirms them on their registered device.",
+        })
+    if limited:
+        found.append({
+            "code": "account_limit", "label": "Transfers on this account are limited by the fraud desk",
+            "reason": "Account limit: the fraud desk limited transfers on this account after an earlier case, so this payment is held until the customer confirms it and a person clears the limit.",
+        })
+    return found
+
+
+def apply_policy(customer_id: str, transaction_id: str, snapshot_id: str | None = None) -> dict:
+    """The rule decision. With a snapshot id it is made on exactly the signals the score used, so the two cannot disagree.
+    Without one (older callers) it reads the signals fresh."""
+    from app import signals as signal_contract
+
+    snapshot = signal_contract.load(snapshot_id) if snapshot_id else None
+    if snapshot is not None:
+        signals = snapshot.as_signals()
+    else:
+        signals, _context = collect_signals(customer_id, transaction_id)
     policy = decide_policy(signals)
     result = {
         "decision": policy.decision,
@@ -270,22 +315,38 @@ def apply_policy(customer_id: str, transaction_id: str) -> dict:
         "factors": list(policy.factors),
         "reason": policy.reason,
         "emergency": None,
+        "snapshot": snapshot.describe() if snapshot else None,
     }
     if policy.decision == "release":
-        with session_scope() as session:
-            user = session.get(User, customer_id)
-            district = user.district if user else None
-        why = must_hold(district, signals.amount_lkr)
-        if why:
-            # Emergency mode can turn a release into a hold. It never releases and never lowers a hold or block.
+        for modifier in policy_modifiers(customer_id, signals.amount_lkr):
             result["decision"] = "hold"
-            result["emergency"] = district
-            result["factors"].append({"label": f"{district} is in emergency mode", "points": 0})
-            result["reason"] = (
-                f"Emergency rule: {district} is in emergency mode ({why}). "
-                f"Payments of {lkr(signals.amount_lkr)} or more are held until the customer confirms them on their registered device."
-            )
+            result["factors"].append({"label": modifier["label"], "points": 0})
+            result["reason"] = modifier["reason"]
+            if modifier["code"] == "emergency":
+                result["emergency"] = modifier["district"]
+            break  # one reason is given. Either is enough to hold, and neither can lower a block.
+    if snapshot is not None:
+        signal_contract.record_decision(snapshot.id, result["decision"], result["score"])
     return result
+
+
+def revalidate_before_release(customer_id: str, transaction_id: str, case_id: str, prior_snapshot_id: str | None, customer_confirmed: bool) -> dict:
+    """The last look before money moves. A fresh snapshot is compared with the one the decision used. If anything is
+    materially worse, or the account has a limit that only a person can lift, the money is not released."""
+    from app import signals as signal_contract
+
+    prior = signal_contract.load(prior_snapshot_id) if prior_snapshot_id else None
+    fresh = signal_contract.build(customer_id, transaction_id, case_id=case_id, purpose="pre_release")
+    reasons = signal_contract.material_changes(prior, fresh)
+    reasons += [m["reason"] for m in policy_modifiers(customer_id, fresh.as_signals().amount_lkr, customer_confirmed=customer_confirmed)]
+    return {
+        "ok": not reasons,
+        "reasons": reasons,
+        "snapshot": fresh.describe(),
+        "snapshot_id": fresh.id,
+        "compared_with": prior.describe() if prior else None,
+        "conflicts": fresh.conflicts,
+    }
 
 
 def create_case(case_id: str) -> dict:
@@ -356,12 +417,10 @@ def deliver_report(case_id: str) -> dict:
     from zoneinfo import ZoneInfo
 
     from app.db import session_scope
-    from app.models import Case
+    from app.models import Case, User
     from app.notify import UnsafeSms, send_email, send_push, send_sms
     from app.report_pdf import build_case_pdf
     from app.util import aware
-
-    from app.models import User
 
     with session_scope() as session:
         case = session.get(Case, case_id)
@@ -426,6 +485,33 @@ def customer_questions(customer_id: str) -> list[dict]:
     return questions
 
 
+def _send_bounded(case_id: str, channel: str, send) -> dict:
+    """Send once, and again only when the failure is one a retry could cure (a timeout, a busy provider) and the limit on
+    attempts allows. A refused credential or a missing address is not retried. Each retry is visible as an event."""
+    from app.events import emit
+    from app.runtime import runtime
+
+    result = send()
+    attempts = 1
+    while result.get("status") == "failed" and (result.get("delivery") or {}).get("retryable") and attempts < runtime.settings.notify_max_attempts:
+        attempts += 1
+        emit(
+            case_id, agent="alert", state="calling_tool", tool_name=f"send_{channel}", phase="retrying",
+            message=f"The {channel} failed ({(result.get('delivery') or {}).get('reason')}). Trying once more, attempt {attempts}.",
+            meta={"attempt": attempts, "reason": (result.get("delivery") or {}).get("reason")},
+        )
+        result = {**send(), "retried": True}
+    result["attempts"] = attempts
+    return result
+
+
+def _count_failures(results: dict) -> None:
+    """A channel that failed is counted, so a gateway that is down shows up as a rising number."""
+    for channel, result in results.items():
+        if isinstance(result, dict) and (result.get("status") == "failed" or result.get(channel) == "failed" or result.get("fcm") == "failed"):
+            ops.count("notification_failures", channel=channel)
+
+
 def alert_customer(user_id: str, case_id: str, amount_lkr: int, payee: str, sms_body: str | None = None) -> dict:
     title = "Confirm a payment"
     push_body = f"A transfer of {lkr(amount_lkr)} to {payee} needs your confirmation in the PayShield app."
@@ -435,12 +521,9 @@ def alert_customer(user_id: str, case_id: str, amount_lkr: int, payee: str, sms_
         "If you did not try to make this payment, choose No in the app.\n"
     )
     push = send_push(user_id, case_id, title, push_body, {"case_id": case_id, "kind": "confirm"})
-    email = send_email(user_id, case_id, "Confirm a payment in PayShield", email_body)
-    if email.get("status") == "failed":
-        email = {**send_email(user_id, case_id, "Confirm a payment in PayShield", email_body), "retried": True}
-    sms = send_sms(user_id, case_id, sms_body or GENERIC_SMS)
-    if sms.get("status") == "failed":
-        sms = {**send_sms(user_id, case_id, sms_body or GENERIC_SMS), "retried": True}
+    email = _send_bounded(case_id, "email", lambda: send_email(user_id, case_id, "Confirm a payment in PayShield", email_body))
+    sms = _send_bounded(case_id, "sms", lambda: send_sms(user_id, case_id, sms_body or GENERIC_SMS))
+    _count_failures({"push": push, "email": email, "sms": sms})
     return {"push": push, "email": email, "sms": sms}
 
 
@@ -450,6 +533,7 @@ def outcome_notice(user_id: str, case_id: str, title: str, body: str, sms_body: 
     sms = None
     if sms_body:
         sms = send_sms(user_id, case_id, sms_body)
+    _count_failures({"push": push, "email": email, "sms": sms})
     return {"push": push, "email": email, "sms": sms}
 
 
