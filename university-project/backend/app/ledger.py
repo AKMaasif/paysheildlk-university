@@ -99,16 +99,20 @@ def request_sim_freeze(phone: str, case_id: str, reason: str) -> dict:
                 phone=phone,
                 event_type="sim_freeze",
                 occurred_at=utcnow(),
-                detail={"reference": reference, "reason": reason, "status": "freeze_requested"},
+                detail={"reference": reference, "reason": reason, "status": "request_recorded_simulated", "operator_contacted": False},
                 origin="demo",
                 case_id=case_id,
+                received_at=utcnow(),
             )
         )
         case = session.get(Case, case_id)
         if case is not None:
             case.sim_freeze_ref = reference
             case.updated_at = utcnow()
-    return {"status": "freeze_requested", "reference": reference, "phoneNumber": phone}
+    # No mobile operator integration for freezing a SIM exists. This records a request and a reference inside PayShield and
+    # nothing else. The result says so, so nothing downstream can describe it as an operator action.
+    return {"status": "request_recorded_simulated", "reference": reference, "phoneNumber": phone, "simulated": True, "operator_contacted": False,
+            "integration": "none", "note": "Recorded in PayShield only. No mobile operator was contacted, so the SIM is not frozen."}
 
 
 def _stamp(moment) -> str:
