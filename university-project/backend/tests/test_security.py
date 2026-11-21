@@ -13,7 +13,12 @@ from app.models import User
 from app.privacy import PrivacyViolation, guard, mask
 from app.protocol import HandoffRejected, open_sealed, seal
 from app.runtime import runtime
-from app.security import hash_password, open_totp, password_needs_upgrade, totp_now, verify_password
+from app.security import (
+    hash_password,
+    open_totp,
+    password_needs_upgrade,
+    verify_password,
+)
 
 
 def _legacy_pbkdf2(password: str) -> str:
@@ -169,5 +174,8 @@ def test_production_refuses_development_secrets(monkeypatch):
     with pytest.raises(RuntimeError, match="DEMO_ASSIST"):
         Settings.from_env().assert_safe_for_environment()
     monkeypatch.setenv("DEMO_ASSIST", "false")
+    with pytest.raises(RuntimeError, match="ALLOWED_ORIGINS"):
+        Settings.from_env().assert_safe_for_environment()
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://bank.example")
     Settings.from_env().assert_safe_for_environment()
     ratelimit.reset_all()
