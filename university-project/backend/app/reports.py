@@ -24,7 +24,7 @@ def render_report(case: Case, user: User, tx: Transaction | None, events: list[C
     else:
         served = "No model call on this case"
     timeline = []
-    for event in events:
+    for event in [e for e in events if getattr(e, "phase", None) != "started"]:
         stamp = colombo_stamp(event.created_at)
         label = event.tool_name or event.state
         text = event.result_summary or event.message or ""
@@ -103,7 +103,7 @@ def render_report(case: Case, user: User, tx: Transaction | None, events: list[C
         "## 8. Actions",
         "",
         f"- Alerts sent before escalation or closure: {case.alert_count}",
-        f"- SIM freeze reference: {freeze}",
+        f"- SIM freeze request (recorded in PayShield only, simulated; no operator contacted): {freeze}",
         f"- Account limited: {'yes' if user.restricted else 'no'}",
         "",
         "## 9. Timeline",
@@ -115,8 +115,9 @@ def render_report(case: Case, user: User, tx: Transaction | None, events: list[C
         "CBSL expects banks to apply risk-based controls on electronic payments and to",
         "keep an audit trail of fraud decisions. TRCSL and the operators control SIM",
         "lifecycle actions such as a freeze. This pilot keeps those responsibilities",
-        "separate: the bank holds or blocks the money, the operator is asked to freeze",
-        "the SIM, and the customer is contacted on the device that was registered before the swap.",
+        "separate: the bank holds or blocks the money, a SIM freeze request is recorded (no",
+        "operator integration exists yet, so the operator must be contacted by a person), and the",
+        "customer is contacted on the device that was registered before the swap.",
         "",
         "## 11. Model note",
         "",
