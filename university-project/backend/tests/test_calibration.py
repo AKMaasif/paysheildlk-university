@@ -8,7 +8,14 @@ from app.charters import CharterViolation, enforce
 from app.db import session_scope
 from app.main import app
 from app.models import AuditLog, Case, PolicyProposal, PolicySetting
-from app.risk import DEFAULTS, SAFE_RANGE, Signals, decide_policy, reset_thresholds, thresholds
+from app.risk import (
+    DEFAULTS,
+    SAFE_RANGE,
+    Signals,
+    decide_policy,
+    reset_thresholds,
+    thresholds,
+)
 from app.runtime import init_runtime, runtime
 from app.security import create_token
 from app.util import nid, utcnow
