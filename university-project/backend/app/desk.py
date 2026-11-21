@@ -1,6 +1,5 @@
 import base64
 import secrets
-from datetime import timedelta
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -11,12 +10,22 @@ from app.charters import CHARTERS
 from app.db import session_scope
 from app.emergency import breaker_status
 from app.ledger import audit, verify_audit_chain
-from app.models import Case, SecurityAnswer, Transaction, User
+from app.models import Case, SecurityAnswer, User
 from app.runtime import runtime
 from app.security import hash_password
-from app.util import aware, nid, utcnow
+from app.util import nid, utcnow
 
 router = APIRouter()
+
+
+def _reader(authorization: str | None = Header(default=None)) -> User:
+    """Any operator, auditors included. For pages an auditor is meant to see: they only read."""
+    from app.api import current_user
+
+    user = current_user(authorization)
+    if user.role not in {"fraud_analyst", "telecom_operator", "bank_supervisor", "auditor", "super_admin"}:
+        raise HTTPException(status_code=403, detail="Operator sign-in required")
+    return user
 
 
 def _writer(authorization: str | None = Header(default=None)) -> User:
@@ -71,7 +80,7 @@ def _charters() -> dict:
 
 @router.get("/api/charters")
 def list_charters(authorization: str | None = Header(default=None)):
-    _writer(authorization)
+    _reader(authorization)
     return _charters()
 
 
@@ -84,7 +93,7 @@ def questions(authorization: str | None = Header(default=None)):
 @router.post("/api/enrol")
 def enrol(body: EnrolIn, authorization: str | None = Header(default=None)):
     from app.customer import clean_account, clean_nic, clean_phone
-    from app.geo import province_of
+    from app.geo import coordinates_of, province_of
 
     actor = _writer(authorization)
     phone = clean_phone(body.phone)
@@ -114,6 +123,8 @@ def enrol(body: EnrolIn, authorization: str | None = Header(default=None)):
                 bank="BankCylone",
                 district=body.district.strip(),
                 province=province_of(body.district.strip()),
+                lat=(coordinates_of(body.district.strip()) or (None, None))[0],
+                lng=(coordinates_of(body.district.strip()) or (None, None))[1],
                 branch=body.branch.strip() or None,
                 account_number=account,
                 nic=nic,
@@ -142,7 +153,7 @@ def enrol(body: EnrolIn, authorization: str | None = Header(default=None)):
 
 @router.get("/api/security/status")
 def security_status(authorization: str | None = Header(default=None)):
-    _writer(authorization)
+    _reader(authorization)
     chain = verify_audit_chain()
     settings = runtime.settings
     return {
@@ -160,7 +171,7 @@ def security_status(authorization: str | None = Header(default=None)):
 
 @router.post("/api/audit/verify")
 def audit_verify(authorization: str | None = Header(default=None)):
-    _writer(authorization)
+    _reader(authorization)
     return verify_audit_chain()
 
 
@@ -169,6 +180,15 @@ def kill_switch(case_id: str, body: KillIn, authorization: str | None = Header(d
     from app import manual
 
     actor = _writer(authorization)
+    if actor.role == "bank_supervisor" and actor.bank:
+        # A supervisor acts only inside their own bank. A case elsewhere looks the same as a case that does not exist.
+        from app.db import session_scope
+        from app.models import Case
+
+        with session_scope() as session:
+            case = session.get(Case, case_id)
+            if case is not None and case.bank != actor.bank:
+                raise HTTPException(status_code=404, detail="Case not found")
     try:
         return manual.apply(case_id, body.action, body.reason, actor.email)
     except LookupError as exc:
@@ -205,8 +225,8 @@ def customer_liveness(case_id: str, body: dict, authorization: str | None = Head
     for item in body.get("frames") or []:
         try:
             frames.append(base64.b64decode(item, validate=True))
-        except Exception:
-            raise HTTPException(status_code=422, detail="A camera frame could not be read. Please scan again.")
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail="A camera frame could not be read. Please scan again.") from exc
     offsets = [int(x) for x in (body.get("offsets_ms") or []) if isinstance(x, (int, float))]
     # Only the camera frames, their times and the signed challenge go to the check. A client-supplied verdict is never forwarded.
     ok = resume_case(case_id, {"frames": frames, "offsets_ms": offsets, "challenge": str(body.get("challenge") or "")}, "waiting_liveness")
@@ -275,10 +295,10 @@ def calibration_decide(proposal_id: str, body: DecideIn, authorization: str | No
     try:
         with session_scope() as session:
             result = calibration.decide(session, proposal_id, body.decision == "approve", actor.email, body.note)
-    except LookupError:
-        raise HTTPException(status_code=404, detail="Proposal not found")
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Proposal not found") from exc
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     audit(actor.email, "calibration_" + body.decision, proposal_id, f"{result['key']} {result['current']} -> {result['proposed']}")
     return result
 
