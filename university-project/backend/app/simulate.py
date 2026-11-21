@@ -10,11 +10,12 @@ import threading
 import time
 from datetime import timedelta
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
 from app import faults, manual
 from app.agents.runner import begin_case, escalate_case, realert_case, spawn_case
+from app.api import require_drills
 from app.db import session_scope
 from app.demo import trigger
 from app.desk import _writer
@@ -167,21 +168,26 @@ def simulate_list(authorization: str | None = Header(default=None)):
     user = current_user(authorization)
     if user.role == "customer":
         raise HTTPException(status_code=403, detail="Operator sign-in required")
+    from app.runtime import runtime
+
+    if not runtime.settings.drills_enabled:
+        # The page still needs the emergency state: the analyst's switch is a real control, not a drill.
+        return {"drills_enabled": False, "scenarios": [], "faults": {}, "emergency": breaker_status(), "customers": [], "default_customer": ""}
     with session_scope() as session:
         customers = [
             {"id": row.id, "name": row.full_name, "district": row.district}
             for row in session.query(User).filter(User.role == "customer").order_by(User.full_name)
         ]
-    return {"scenarios": SCENARIOS, "faults": faults.snapshot(), "emergency": breaker_status(), "customers": customers, "default_customer": DEFAULT_CUSTOMER}
+    return {"drills_enabled": True, "scenarios": SCENARIOS, "faults": faults.snapshot(), "emergency": breaker_status(), "customers": customers, "default_customer": DEFAULT_CUSTOMER}
 
 
-@router.post("/api/simulate/run")
+@router.post("/api/simulate/run", dependencies=[Depends(require_drills)])
 def simulate_run(body: RunIn, authorization: str | None = Header(default=None)):
     actor = _writer(authorization)
     return run(body.scenario, body.customer_id, actor.email)
 
 
-@router.post("/api/simulate/clear")
+@router.post("/api/simulate/clear", dependencies=[Depends(require_drills)])
 def simulate_clear(authorization: str | None = Header(default=None)):
     """Switch every drill off and remove the placeholder payments a spike drill added.
     An analyst's own emergency switch is a real control and is left alone."""
