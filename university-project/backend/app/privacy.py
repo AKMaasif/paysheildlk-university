@@ -80,3 +80,26 @@ def untrusted(text, limit: int = 80) -> str:
     if len(value) > limit:
         value = value[: limit - 1].rstrip() + "\u2026"
     return "\u00ab" + value + "\u00bb"
+
+
+# Keys whose values are never stored in a trace or shown in the activity terminal, whatever they hold.
+_NEVER_SHOWN = re.compile(
+    r"(password|passcode|pin\b|otp|totp|secret|token|api_?key|authorization|answer|embedding|template|face_ref|face_hash|signature|private|credential|jwt|hash)",
+    re.IGNORECASE,
+)
+
+
+def redact(value, depth: int = 0):
+    """A copy of a tool's structured result that is safe to store and show: secret-looking keys are dropped,
+    identifiers in text are masked, and very long values are cut. Booleans, numbers and short codes pass through."""
+    if depth > 6:
+        return "[deep]"
+    if isinstance(value, dict):
+        return {str(k): redact(v, depth + 1) for k, v in value.items() if not _NEVER_SHOWN.search(str(k))}
+    if isinstance(value, (list, tuple)):
+        return [redact(v, depth + 1) for v in list(value)[:25]]
+    if isinstance(value, str):
+        return mask(value)[:300]
+    if isinstance(value, (bool, int, float)) or value is None:
+        return value
+    return mask(str(value))[:300]
