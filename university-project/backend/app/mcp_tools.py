@@ -93,7 +93,8 @@ _IMPL = {fn.__name__: fn for fn in (
     get_sim_swap_status, get_device_change, get_location_events, get_port_out_status, get_sim_history,
     get_recent_transactions, get_customer_profile, get_payee_history, get_credential_events,
 )}
-assert set(_IMPL) == set(READ_TOOLS)
+if set(_IMPL) != set(READ_TOOLS):
+    raise RuntimeError("the MCP tool list and the read tools have drifted apart")
 
 
 def offered(agent: str) -> list[str]:
