@@ -4,11 +4,14 @@ Counts live in process memory. That is enough for the single-process pilot; a
 multi-process deployment would move the same windows into Redis.
 """
 
+import os
 import threading
 import time
 from collections import deque
 
 from fastapi import HTTPException
+
+from app import ops
 
 # bucket -> (attempts allowed, window in seconds)
 LIMITS: dict[str, tuple[int, int]] = {
@@ -26,6 +29,16 @@ LIMITS: dict[str, tuple[int, int]] = {
     "register_fail": (6, 15 * 60),
     "pw_change": (6, 15 * 60),
 }
+
+# Only the per-address buckets can be widened, and only outside production: the browser tests sign in and register
+# many times from one address. The per-account buckets (failed passwords, codes, answers) are never widened.
+if os.environ.get("APP_ENV", "development").lower() != "production":
+    try:
+        _scale = max(1, min(int(os.environ.get("RATE_LIMIT_SCALE", "1")), 50))
+    except ValueError:
+        _scale = 1
+    for _bucket in ("login_ip", "register_ip", "refresh"):
+        LIMITS[_bucket] = (LIMITS[_bucket][0] * _scale, LIMITS[_bucket][1])
 
 _lock = threading.Lock()
 _hits: dict[tuple[str, str], deque] = {}
@@ -56,6 +69,7 @@ def check(bucket: str, key: str) -> None:
     """Raise 429 when the bucket is full. Does not count an attempt."""
     wait = retry_after(bucket, key)
     if wait:
+        ops.count("rate_limit_blocks", bucket=bucket)
         raise HTTPException(
             status_code=429,
             detail=f"Too many attempts. Try again in {max(1, wait // 60)} minute(s).",
@@ -64,6 +78,7 @@ def check(bucket: str, key: str) -> None:
 
 
 def hit(bucket: str, key: str) -> None:
+    ops.count("rate_limit_attempts", bucket=bucket)
     allowed, span = LIMITS[bucket]
     now = time.monotonic()
     with _lock:
