@@ -1,5 +1,6 @@
 """Registration, username sign-in, account summary and password change for the customer site."""
 from fastapi.testclient import TestClient
+from helpers import PASSWORD, frames, record, register, sign_in
 
 from app.agents.runner import begin_case, resume_case
 from app.db import session_scope
@@ -7,7 +8,6 @@ from app.demo import trigger
 from app.main import app
 from app.models import Case, Notification, Transaction, User
 from app.security import verify_password
-from helpers import PASSWORD, frames, record, register, registration, sign_in
 
 
 def _user(customer_id="cus_nimal"):
@@ -213,8 +213,8 @@ def test_routine_release_debits_the_balance_and_does_not_force_a_new_password(bo
 
 
 def test_console_adds_a_bank_record_that_the_customer_then_claims(boot):
-    from app.security import create_token
     from app.runtime import runtime
+    from app.security import create_token
 
     token = create_token(runtime.settings, "usr_analyst", "fraud_analyst")
     with TestClient(app) as client:
