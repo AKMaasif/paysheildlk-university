@@ -100,6 +100,19 @@ def _open_port(event: SimEvent | None, now) -> bool:
 
 
 def collect_signals(customer_id: str, transaction_id: str, use_profile: bool | None = None) -> tuple[Signals, dict]:
+    signals, context, _observed = read_signals(customer_id, transaction_id, use_profile)
+    return signals, context
+
+
+def _seen(event: SimEvent | None) -> dict:
+    """Where one observation came from: what happened, when it happened, and when this system took it in."""
+    if event is None:
+        return {"event_id": None, "occurred_at": None, "received_at": None, "origin": None}
+    return {"event_id": event.id, "occurred_at": iso(event.occurred_at), "received_at": iso(event.received_at), "origin": event.origin}
+
+
+def read_signals(customer_id: str, transaction_id: str, use_profile: bool | None = None) -> tuple[Signals, dict, dict]:
+    """The signals a decision depends on, read once from the local records, and the provenance of each observation."""
     now = utcnow()
     with session_scope() as session:
         user = session.get(User, customer_id)
@@ -156,6 +169,18 @@ def collect_signals(customer_id: str, transaction_id: str, use_profile: bool | N
             familiar_payment=learned["familiar_payment"],
             unusual_amount=learned["unusual_amount"],
         )
+        reset_row = max(resets, key=lambda item: item.occurred_at) if resets else None
+        observed = {
+            "read_at": iso(now),
+            "sim_swap": _seen(swap),
+            "new_imei": _seen(imei),
+            "location_change": _seen(location),
+            "port_out": {**_seen(port), "open": signals.port_out},
+            "password_reset": {"event_id": reset_row.id if reset_row else None, "occurred_at": iso(reset_row.occurred_at) if reset_row else None, "origin": reset_row.origin if reset_row else None},
+            "new_device_login": {"occurred_at": None, "origin": "bank ledger", "within_hours": 24},
+            "payment": {"transaction_id": tx.id, "occurred_at": iso(tx.occurred_at), "origin": tx.origin, "new_payee": bool(tx.new_payee)},
+            "profile": {"used": bool(use_profile), "familiar_payment": learned["familiar_payment"], "unusual_amount": learned["unusual_amount"]},
+        }
         context = {
             "customer": user.full_name,
             "phone": user.phone,
@@ -170,4 +195,4 @@ def collect_signals(customer_id: str, transaction_id: str, use_profile: bool | N
             "port_out": signals.port_out,
             "transactions": [_tx_dict(item) for item in session.query(Transaction).filter(Transaction.customer_id == customer_id).order_by(Transaction.occurred_at.desc()).limit(8)],
         }
-        return signals, context
+        return signals, context, observed
