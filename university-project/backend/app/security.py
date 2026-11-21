@@ -29,7 +29,11 @@ def _verify_legacy_pbkdf2(password: str, stored: str) -> bool:
         return False
     if scheme != "pbkdf2":
         return False
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt_hex), 20_000)
+    try:
+        salt = bytes.fromhex(salt_hex)
+    except ValueError:
+        return False
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 20_000)
     return hmac.compare_digest(digest.hex(), digest_hex)
 
 
