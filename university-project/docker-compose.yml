@@ -31,6 +31,9 @@ services:
       DATABASE_URL: postgresql+psycopg://payshield:payshield@postgres:5432/payshield
       REDIS_URL: redis://redis:6379/0
       APP_ENV: ${APP_ENV:-development}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-payshield-pilot}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev-only-payshield-encryption-key}
       HMAC_KEY: ${HMAC_KEY:-dev-only-payshield-hmac-key}
@@ -43,6 +46,11 @@ services:
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
       FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      DEMO_MODE: ${DEMO_MODE:-deterministic}
+      DEMO_ALLOWED_PHONES: ${DEMO_ALLOWED_PHONES:-}
+      DEMO_ALLOWED_EMAILS: ${DEMO_ALLOWED_EMAILS:-}
+      NOTIFY_MAX_PER_HOUR: ${NOTIFY_MAX_PER_HOUR:-20}
+      NOTIFY_MAX_ATTEMPTS: ${NOTIFY_MAX_ATTEMPTS:-2}
       TEXTLK_API_KEY: ${TEXTLK_API_KEY:-}
       TEXTLK_API_URL: ${TEXTLK_API_URL:-https://app.text.lk/api/v3/sms/send}
       SMS_SENDER_ID: ${SMS_SENDER_ID:-PayShield}
@@ -63,6 +71,13 @@ services:
       TELCO_TOKEN: ${TELCO_TOKEN:-}
     ports:
       - "8000:8000"
+    healthcheck:
+      # 200 only when the database, the checkpointer and the reminder timers are all working.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/ready', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,10 +85,14 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # Set NEXT_PUBLIC_WS_URL (for example wss://bank.example/ws) when the site is served over https through a proxy.
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-}
+        NEXT_PUBLIC_WS_PORT: ${NEXT_PUBLIC_WS_PORT:-8000}
     environment:
       API_PROXY_URL: http://backend:8000
-      NEXT_PUBLIC_WS_PORT: "8000"
     ports:
       - "3000:3000"
     depends_on:
