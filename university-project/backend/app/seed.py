@@ -1,3 +1,4 @@
+import re
 import secrets
 from datetime import timedelta
 
@@ -232,6 +233,28 @@ HISTORY = [
 ]
 
 
+def seed_production(session, settings) -> bool:
+    """A real deployment starts with one administrator and nothing else: no fictional customers, no demonstration
+    operators and no published passwords. The administrator's address and password come from the environment."""
+    if session.query(User).count():
+        return False
+    email, password = settings.bootstrap_admin_email, settings.bootstrap_admin_password
+    if not email or not password:
+        raise RuntimeError("First start in production: set BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD to create the first administrator.")
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise RuntimeError("BOOTSTRAP_ADMIN_EMAIL is not an email address.")
+    published = {op[3] for op in OPERATORS}
+    if len(password) < 14 or password in published or not re.search(r"[A-Za-z]", password) or not re.search(r"\d", password):
+        raise RuntimeError("BOOTSTRAP_ADMIN_PASSWORD must be at least 14 characters with a letter and a number, and not one of the published demonstration passwords.")
+    session.add(
+        User(
+            id=nid("usr"), email=email, full_name="Administrator", password_hash=hash_password(password), role="super_admin",
+            status="active", totp_enrolled=False, restricted=False, created_at=utcnow(),
+        )
+    )
+    return True
+
+
 def seed(session, settings) -> bool:
     existing = session.query(User).count()
     if existing:
@@ -310,7 +333,7 @@ def seed(session, settings) -> bool:
 
     session.add(
         Invitation(
-            token="PS-INVITE-7K2M",
+            token="PS-INVITE-7K2M",  # noqa: S106 - a fictional invitation for the demonstration
             email="priya.fernando@mail.lk",
             full_name="Priya Fernando",
             role="fraud_analyst",
