@@ -40,3 +40,21 @@ def sign_in(client, customer_id: str = "cus_nimal", password: str = PASSWORD) ->
     reply = client.post("/api/auth/login", json={"email": row["name"], "password": password, "portal": "customer"})
     assert reply.status_code == 200, reply.text
     return {"Authorization": "Bearer " + reply.json()["token"]}
+
+
+def external_services() -> tuple[str | None, str | None]:
+    """A real Postgres and Redis when TEST_DATABASE_URL and TEST_REDIS_URL are set, emptied first. Otherwise (None, None)."""
+    database, redis_url = os.environ.get("TEST_DATABASE_URL"), os.environ.get("TEST_REDIS_URL")
+    if database:
+        import psycopg
+
+        from app.runtime import psycopg_url
+
+        with psycopg.connect(psycopg_url(database), autocommit=True) as conn:
+            conn.execute("DROP SCHEMA IF EXISTS public CASCADE")
+            conn.execute("CREATE SCHEMA public")
+    if redis_url:
+        import redis
+
+        redis.Redis.from_url(redis_url).flushall()
+    return database, redis_url
