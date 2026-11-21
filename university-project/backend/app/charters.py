@@ -47,7 +47,7 @@ CHARTERS: dict[str, Charter] = {
     "policy": Charter(
         "Policy",
         "Deterministic hold, block, or release. Models do not vote.",
-        ("compute_risk_score", "hold_transaction", "release_transaction"),
+        ("compute_risk_score", "hold_transaction", "revalidate_before_release", "release_transaction"),
         "Score and the rule table.",
         ("lock_account", "generate_report", "send_sms"),
         "May hold, and may release a low-risk payment. May not lock the account.",
@@ -63,7 +63,7 @@ CHARTERS: dict[str, Charter] = {
     "verification": Charter(
         "Verification",
         "Check a live face capture, match it to the face on file, then the knowledge rounds, and release if they pass.",
-        ("liveness_check", "face_match", "ask_security_questions", "update_face_template", "release_transaction"),
+        ("liveness_check", "face_match", "ask_security_questions", "update_face_template", "revalidate_before_release", "release_transaction"),
         "Hashes, the match score and the verdict. Never the raw answers or the image.",
         ("block_transaction", "lock_account", "generate_report"),
         "Release only after a pass. A face that does not match, or a fake, twice goes to Response. An unsure face goes to a person. A very confident, fully confirmed match may refresh the stored templates.",
