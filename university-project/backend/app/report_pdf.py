@@ -16,15 +16,15 @@ and the SHA-256 stored on the report row can be re-checked on download.
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 from fpdf import FPDF
 
 from app.db import session_scope
 from app.models import Case, CaseEvent, Report, Transaction, User
-from app.util import aware, colombo_stamp, lkr
+from app.util import aware, lkr
 
 # Palette. Teal is the brand; outcome colours are only used for the outcome.
 INK = (24, 33, 38)
@@ -73,6 +73,7 @@ def milestones(events: list[CaseEvent]) -> list[Milestone]:
     found: list[Milestone] = []
     seen: set[str] = set()
     rounds = 0
+    events = [e for e in events if getattr(e, "phase", None) != "started"]
 
     def add(event: CaseEvent, label: str, kind: str, once: bool = True) -> None:
         if once and label in seen:
@@ -104,7 +105,7 @@ def milestones(events: list[CaseEvent]) -> list[Milestone]:
         elif tool == "block_transaction":
             add(event, "Payment blocked", "bad")
         elif tool == "request_sim_freeze":
-            add(event, "SIM freeze asked", "bad")
+            add(event, "Freeze logged", "bad")
         elif tool == "lock_account":
             add(event, "Account locked", "bad")
         elif event.agent == "supervisor" and "analyst" in summary:
@@ -286,7 +287,7 @@ class _Doc(FPDF):
         self.set_font("Helvetica", "B", 7.6)
         self.set_fill_color(*TEAL_SOFT)
         self.set_text_color(*INK)
-        for width, head in zip(widths, heads):
+        for width, head in zip(widths, heads, strict=False):
             self.cell(width, 5.5, head, fill=True)
         self.ln(5.5)
         self.set_font("Helvetica", "", 7.4)
@@ -325,7 +326,7 @@ def _customer_steps(case: Case, restricted: bool) -> list[str]:
     if case.status == "closed_blocked":
         steps = [
             "The transfer is blocked and no money left your account.",
-            f"We asked your mobile operator to freeze the SIM. Reference {case.sim_freeze_ref or '-'}." if case.sim_freeze_ref else "Your SIM was not frozen on this case.",
+            f"We recorded a SIM freeze request, reference {case.sim_freeze_ref}. Your mobile operator has not been told, so call them to freeze the SIM." if case.sim_freeze_ref else "No SIM freeze request was recorded on this case.",
             "Transfers, new payees, password resets and port-out stay locked until the fraud desk clears them." if restricted else "No account limits were applied.",
             "Call your bank on the number printed on your card. Do not use a number from a text message.",
         ]
@@ -358,7 +359,7 @@ def build_case_pdf(case_id: str, audience: str = "analyst") -> bytes:
         report = session.query(Report).filter(Report.case_id == case_id).one_or_none()
         cutoff = aware(report.created_at) if report is not None else None
         query = session.query(CaseEvent).filter(CaseEvent.case_id == case_id)
-        events = query.order_by(CaseEvent.created_at.asc(), CaseEvent.id.asc()).all()
+        events = [e for e in query.order_by(CaseEvent.created_at.asc(), CaseEvent.id.asc()).all() if e.phase != "started"]  # a start marker is progress, not an outcome
         if cutoff is not None:
             events = [event for event in events if aware(event.created_at) <= cutoff]
         for item in (case, user, tx, report, *events):
