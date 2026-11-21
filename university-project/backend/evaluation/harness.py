@@ -81,7 +81,7 @@ def seed_scenario(sc: Scenario, payee_override: str | None = None) -> dict:
             )
 
         def sim(kind, hours, detail=None):
-            session.add(SimEvent(id=nid("sim"), phone=phone, event_type=kind, occurred_at=now - timedelta(hours=hours), detail=detail or {}, origin="eval"))
+            session.add(SimEvent(id=nid("sim"), phone=phone, event_type=kind, occurred_at=now - timedelta(hours=hours), detail=detail or {}, origin="eval", received_at=now))
 
         if sc.swap_h is not None:
             sim("sim_swap", sc.swap_h, {"channel": "ussd"})
@@ -136,7 +136,8 @@ def run_case(sc: Scenario, payee_override: str | None = None) -> dict:
     with session_scope() as session:
         case = session.get(Case, case_id)
         tx = session.get(Transaction, ctx["transaction_id"])
-        events = session.query(CaseEvent).filter(CaseEvent.case_id == case_id).all()
+        # A tool call is a start marker and a result. Outcomes are the results, so the start markers are left out.
+        events = [e for e in session.query(CaseEvent).filter(CaseEvent.case_id == case_id).all() if e.phase != "started"]
         out = {
             "case_id": case_id,
             "decision": case.policy_decision,
