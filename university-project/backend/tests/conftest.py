@@ -5,10 +5,13 @@ from app.runtime import init_runtime, runtime
 
 @pytest.fixture
 def boot(tmp_path, monkeypatch):
-    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path}/app.db")
+    from helpers import external_services
+
+    database, redis_url = external_services()
+    monkeypatch.setenv("DATABASE_URL", database or f"sqlite:///{tmp_path}/app.db")
     monkeypatch.setenv("CHECKPOINT_PATH", str(tmp_path / "checkpoints.sqlite"))
-    monkeypatch.setenv("CHECKPOINTER", "sqlite")
-    monkeypatch.setenv("REDIS_URL", "")
+    monkeypatch.setenv("CHECKPOINTER", "postgres" if database else "sqlite")
+    monkeypatch.setenv("REDIS_URL", redis_url or "")
     monkeypatch.setenv("JWT_SECRET", "test-secret-not-for-production-use")
     monkeypatch.setenv("STEP_DELAY_MS", "0")
     monkeypatch.setenv("FACE_ENGINE", "legacy")
