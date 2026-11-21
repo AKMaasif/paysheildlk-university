@@ -45,7 +45,7 @@ def supervisor() -> list[dict]:
 
     rejected = attempts = 0
     for i in range(20):
-        valid = lambda: seal(key, "telecom", "risk", f"C{i}", {"swapped": "yes"})
+        valid = lambda i=i: seal(key, "telecom", "risk", f"C{i}", {"swapped": "yes"})
         # altered payload
         s = valid(); s["payload"] = {"swapped": "no"}
         attempts += 1; rejected += _refuses(key, s, "risk", f"C{i}")
@@ -377,20 +377,12 @@ def report(case_ids: list[str]) -> list[dict]:
 # ---------------------------------------------------------------- analytics
 
 def analytics() -> list[dict]:
-    from datetime import timedelta
 
     from app import analytics as an
-    from app.db import session_scope
     from app.llm import LLMResult
-    from app.models import Transaction
     from app.runtime import runtime
-    from app.util import utcnow
 
     data = an.compute()
-    first = utcnow() - timedelta(days=an.WINDOW_DAYS + 1)
-    with session_scope() as session:
-        rows = [t for t in session.query(Transaction).filter(Transaction.occurred_at >= first).all() if t.kind not in an.NOT_PAYMENTS]
-        blocked = sum(1 for t in rows if t.status == "blocked")
     in_window = sum(d["payments"] for d in data["daily"])
     total_ok = int(data["totals"]["payments"] == in_window)
     district_ok = int(sum(d["payments"] for d in data["by_district"]) <= data["totals"]["payments"])
