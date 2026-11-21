@@ -3,7 +3,9 @@ import json
 import time
 
 import pytest
+from face_fakes import FakeEngine, burst, frame, near, turn_left_then_open, vec
 from fastapi.testclient import TestClient
+from helpers import PASSWORD, record
 
 from app import face
 from app.agents.runner import begin_case, resume_case
@@ -12,8 +14,6 @@ from app.demo import trigger
 from app.main import app
 from app.models import Case, Transaction, User
 from app.runtime import runtime
-from face_fakes import FakeEngine, burst, frame, near, turn_left_then_open, vec
-from helpers import PASSWORD, record
 
 ENROLLED = vec(1)
 
