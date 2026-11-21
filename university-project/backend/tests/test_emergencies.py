@@ -2,7 +2,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import faults
-from app.agents.runner import begin_case, escalate_case, fail_safe, realert_case, resume_case
+from app.agents.runner import (
+    begin_case,
+    escalate_case,
+    fail_safe,
+    realert_case,
+    resume_case,
+)
 from app.db import session_scope
 from app.demo import reset_demo, trigger
 from app.emergency import SPIKE_COUNT, breaker_status, clear_emergency, force_emergency
