@@ -10,12 +10,12 @@ from pathlib import Path
 
 
 def run(per_archetype: int, seed: int, injection_scenarios: bool = True) -> dict:
-    from app import faults
+    import random
+
     from app.runtime import runtime
     from evaluation import baseline, bench, harness, metrics
-    from evaluation.archetypes import generate, routine_bill, classic_takeover
+    from evaluation.archetypes import classic_takeover, generate, routine_bill
     from evaluation.injections import PAYLOADS
-    import random
 
     started = time.time()
     harness.boot()
@@ -57,7 +57,7 @@ def run(per_archetype: int, seed: int, injection_scenarios: bool = True) -> dict
     for sc in generate(per_archetype, seed):
         out = baseline.rules_single(sc)
         base_rows.append({"fraud": sc.fraud, "decision": out["decision"], "latency_s": out["latency_s"], "archetype": sc.archetype, "group": sc.group})
-    agree = sum(1 for a, b in zip(rows, base_rows) if a["decision"] == b["decision"])
+    agree = sum(1 for a, b in zip(rows, base_rows, strict=False) if a["decision"] == b["decision"])
     single = {
         "rules_single_agent": {
             "same_decision_as_multi_agent": f"{agree} of {len(rows)}",
@@ -131,8 +131,8 @@ def run(per_archetype: int, seed: int, injection_scenarios: bool = True) -> dict
         runtime.settings.mcp_tools = False
         mcp_effect = {
             "ran": True, "cases": len(sample),
-            "same_decision_score_and_ledger": sum(1 for a, b in zip(direct, via) if (a["decision"], a["score"], a["tx_status"]) == (b["decision"], b["score"], b["tx_status"])),
-            "same_tool_calls": sum(1 for a, b in zip(direct, via) if sorted(e[1] for e in a["events"] if e[1]) == sorted(e[1] for e in b["events"] if e[1])),
+            "same_decision_score_and_ledger": sum(1 for a, b in zip(direct, via, strict=False) if (a["decision"], a["score"], a["tx_status"]) == (b["decision"], b["score"], b["tx_status"])),
+            "same_tool_calls": sum(1 for a, b in zip(direct, via, strict=False) if sorted(e[1] for e in a["events"] if e[1]) == sorted(e[1] for e in b["events"] if e[1])),
             "latency_s": {"direct_p50": metrics.percentile([r["latency_s"] for r in direct], 50), "mcp_p50": metrics.percentile([r["latency_s"] for r in via], 50)},
             "mcp_calls": mcp_tools.bridge.calls, "fallbacks_to_direct": mcp_tools.bridge.fallbacks,
             "offered": {a: mcp_tools.offered(a) for a in ("telecom", "banking")},
