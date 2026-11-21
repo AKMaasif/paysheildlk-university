@@ -1,8 +1,16 @@
 from datetime import timedelta
 
 from app.db import session_scope
-from app.models import Case, CaseEvent, Notification, Report, SimEvent, Transaction, User
-from app.seed import CUSTOMERS, PILOT_ANSWERS
+from app.models import (
+    Case,
+    CaseEvent,
+    Notification,
+    Report,
+    SimEvent,
+    Transaction,
+    User,
+)
+from app.seed import PILOT_ANSWERS
 from app.util import nid, utcnow
 
 
@@ -90,6 +98,7 @@ def _sim(session, phone, kind, when, detail, case_id) -> None:
             detail=detail,
             origin="demo",
             case_id=case_id,
+            received_at=utcnow(),  # it happened a little while ago; this system took it in now
         )
     )
 
