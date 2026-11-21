@@ -1,14 +1,16 @@
 import json
 import logging
 import threading
+import time
 from pathlib import Path
 
+from app import migrate
 from app.agents.runner import timeout_loop
 from app.config import Settings
-from app.db import Base, configure_engine, session_scope
+from app.db import configure_engine, session_scope
 from app.events import EventBus
 from app.llm import LLMRouter
-from app.seed import seed
+from app.seed import seed, seed_production
 
 log = logging.getLogger("payshield")
 
@@ -26,6 +28,7 @@ class Runtime:
         self.checkpointer_kind = "sqlite"
         self.stop: threading.Event | None = None
         self.generation = 0
+        self.last_sweep = 0.0  # when the reminder and escalation sweep last ran
 
 
 runtime = Runtime()
@@ -87,6 +90,7 @@ def start_background() -> None:
     stop_background()
     runtime.generation += 1
     runtime.stop = threading.Event()
+    runtime.last_sweep = time.time()
     threads = [
         threading.Thread(
             target=timeout_loop,
@@ -119,8 +123,8 @@ def redis_loop(stop: threading.Event) -> None:
         runtime.bus.observe_remote(payload)
 
 
-def _ensure_columns(engine) -> None:
-    """Add columns introduced after the first pilot database."""
+def _add_legacy_columns(conn) -> None:
+    """Add the columns introduced after the first pilot database. Only a database from before migrations needs this."""
     alters = {
         "users": {
             "username": "VARCHAR(80)",
@@ -145,16 +149,15 @@ def _ensure_columns(engine) -> None:
         "reports": {"sha256": "VARCHAR(64)"},
         "audit_log": {"prev_hash": "VARCHAR(64)", "entry_hash": "VARCHAR(64)"},
     }
-    with engine.begin() as conn:
-        for table, columns in alters.items():
-            found = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()} if engine.dialect.name == "sqlite" else set()
-            if engine.dialect.name != "sqlite":
-                continue
-            if not found:
-                continue
-            for name, ddl in columns.items():
-                if name not in found:
-                    conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+    if conn.dialect.name != "sqlite":
+        return  # the first pilot ran on SQLite; a Postgres database was never made without these columns
+    for table, columns in alters.items():
+        found = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()}
+        if not found:
+            continue
+        for name, ddl in columns.items():
+            if name not in found:
+                conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
 
 
 def init_runtime() -> None:
@@ -178,8 +181,7 @@ def init_runtime() -> None:
         if raw and raw != ":memory:":
             Path(raw).parent.mkdir(parents=True, exist_ok=True)
     engine = configure_engine(settings.database_url)
-    Base.metadata.create_all(engine)
-    _ensure_columns(engine)
+    migrate.upgrade(engine, legacy_columns=_add_legacy_columns)
     runtime.settings = settings
     runtime.engine = engine
     runtime.bus = EventBus()
@@ -201,13 +203,15 @@ def init_runtime() -> None:
     from app.util import utcnow
 
     with session_scope() as session:
-        created = seed(session, settings)
+        created = (seed_production if settings.app_env == "production" else seed)(session, settings)
         upgrade_existing(session)
         from app.calibration import load_thresholds
 
         load_thresholds(session)
         # Databases made by an older build get the current simulated book in place.
-        rebuilt = refresh_simulated_book(session, utcnow())
+        rebuilt = refresh_simulated_book(session, utcnow()) if settings.simulated_book else False
+    if settings.app_env == "production" and not settings.telco_base_url:
+        log.warning("TELCO_BASE_URL is empty: SIM-swap answers come from the built-in simulation, not from a mobile operator. The rules have no real SIM data to work on.")
     if created:
         log.info("Seeded the pilot workspace")
     elif rebuilt:
