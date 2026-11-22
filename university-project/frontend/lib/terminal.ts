@@ -1,4 +1,5 @@
 import type { LiveEvent } from "@/components/Shell";
+import { deliveryLine, freezeLine } from "@/lib/delivery";
 import { colombo } from "@/lib/format";
 
 export type TermKind = "tool" | "model" | "result" | "decision" | "success" | "error" | "handoff" | "note";
@@ -39,6 +40,7 @@ const TOOL_LABEL: Record<string, string> = {
   get_payee_history: "bank.payeeHistory",
   get_credential_events: "bank.credentialEvents",
   compute_risk_score: "risk.score",
+  revalidate_before_release: "policy.lastLook",
   hold_transaction: "bank.hold",
   block_transaction: "bank.block",
   release_transaction: "bank.release",
@@ -66,6 +68,7 @@ const TOOL_NODE: Record<string, string> = {
   get_payee_history: "transactions",
   get_credential_events: "transactions",
   compute_risk_score: "risk",
+  revalidate_before_release: "release",
   hold_transaction: "policy",
   block_transaction: "block",
   release_transaction: "release",
@@ -168,13 +171,16 @@ function shortResult(event: LiveEvent): string {
     return `<- swapped=true latest=${latest}${tail}`;
   }
   if (/no sim swap/i.test(text)) return `<- swapped=false${tail}`;
-  if (event.tool_name === "send_sms") return /failed/i.test(text) ? `<- sms=FAILED after retry, falling back to push and email${tail}` : `<- sms=log-only${tail}`;
-  if (event.tool_name === "send_email") return /failed/i.test(text) ? `<- email=FAILED after retry, falling back to push and the in-app inbox${tail}` : `<- email=log-only${tail}`;
-  if (event.tool_name === "send_push") return `<- push=in-app${tail}`;
+  if (event.tool_name === "send_sms" || event.tool_name === "send_email" || event.tool_name === "send_push") {
+    // What the provider actually answered, from the structured result. Never guessed from the wording.
+    const channel = event.tool_name.replace("send_", "") as "sms" | "email" | "push";
+    const line = deliveryLine(channel, event.result as never);
+    return `<- ${line.text}${tail}`;
+  }
   if (event.tool_name === "hold_transaction") return `<- held${tail}`;
   if (event.tool_name === "block_transaction") return `<- blocked${tail}`;
   if (event.tool_name === "release_transaction") return `<- released${tail}`;
-  if (event.tool_name === "request_sim_freeze") return `<- sim frozen${tail}`;
+  if (event.tool_name === "request_sim_freeze") return `<- ${freezeLine(event.result as never)}${tail}`;
   if (event.tool_name === "lock_account") return `<- account locked${tail}`;
   if (event.tool_name === "generate_report") return `<- report filed${tail}`;
   if (event.tool_name === "compute_risk_score" && event.agent === "policy") return policyLine(text);
@@ -195,7 +201,8 @@ function modelLine(event: LiveEvent): string {
 }
 
 function successTool(name: string | null | undefined): boolean {
-  return ["block_transaction", "release_transaction", "request_sim_freeze", "lock_account", "generate_report"].includes(name || "");
+  // A SIM freeze is not listed: it is only a recorded request, never a success to show in green.
+  return ["block_transaction", "release_transaction", "lock_account", "generate_report"].includes(name || "");
 }
 
 export function terminalLines(event: LiveEvent, timers?: { realert: number; escalate: number }): TermLine[] {
@@ -214,13 +221,25 @@ export function terminalLines(event: LiveEvent, timers?: { realert: number; esca
 
   if (event.tool_name) {
     const label = TOOL_LABEL[event.tool_name] || event.tool_name;
-    push(":call", "tool", "tools", `${tag}.call ${label}(${formatArgs(event.tool_args)})`);
-    const result = shortResult(event);
-    if (result) {
-      const decision = event.tool_name === "compute_risk_score" && event.agent === "policy";
-      const ok = successTool(event.tool_name);
-      const failed = /=FAILED/.test(result);
-      push(":res", failed ? "error" : decision ? "decision" : ok ? "success" : "result", decision || ok ? "decisions" : "tools", result);
+    const planner = event.meta?.planner && event.meta.planner !== "workflow" ? ` [${event.meta.planner}]` : "";
+    if (event.phase === "started") {
+      // Shown the moment the call begins, so a slow provider is visible as in progress, not as a gap.
+      push(":call", "tool", "tools", `${tag}.call ${label}(${formatArgs(event.tool_args)})${planner} ... running`);
+    } else if (event.phase === "retrying") {
+      push(":retry", "note", "tools", `retry: ${event.message || "trying again"}`);
+    } else if (event.phase === "failed") {
+      push(":res", "error", "tools", `${label} FAILED${event.latency_ms != null ? ` after ${latency(event)}` : ""}: ${event.message || "the call failed"}`);
+    } else {
+      // A finished call, or an older event that is a call and result in one.
+      if (!event.phase) push(":call", "tool", "tools", `${tag}.call ${label}(${formatArgs(event.tool_args)})${planner}`);
+      const result = shortResult(event);
+      if (result) {
+        const decision = event.tool_name === "compute_risk_score" && event.agent === "policy";
+        const ok = successTool(event.tool_name);
+        const failed = /=FAILED/.test(result);
+        const shown = event.phase === "finished" ? `${label} ${result}` : result;
+        push(":res", failed ? "error" : decision ? "decision" : ok ? "success" : "result", decision || ok ? "decisions" : "tools", shown);
+      }
     }
   }
 
