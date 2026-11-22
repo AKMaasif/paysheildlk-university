@@ -2,10 +2,11 @@ export const dynamic = "force-dynamic";
 
 const HOP = new Set(["connection", "content-length", "transfer-encoding", "host"]);
 
-async function proxy(req: Request, context: { params: { path: string[] } }) {
+async function proxy(req: Request, context: { params: Promise<{ path: string[] }> }) {
+  const { path } = await context.params;
   const base = process.env.API_PROXY_URL || "http://127.0.0.1:8000";
   const incoming = new URL(req.url);
-  const url = `${base}/${context.params.path.join("/")}${incoming.search}`;
+  const url = `${base}/${path.join("/")}${incoming.search}`;
   const headers = new Headers();
   req.headers.forEach((value, key) => {
     if (!HOP.has(key.toLowerCase())) headers.set(key, value);
