@@ -110,11 +110,31 @@ That backend uses SQLite under `backend/data/` and the in-memory event bus.
 Tests:
 
 ```bash
-cd backend
-pytest
+cd backend && pytest                 # 1,558 backend cases: agents, rules, API permissions, security, load, resilience
+cd e2e && npm install && node run.mjs   # 73 browser tests, desktop and phone, with accessibility checks
+cd frontend && npm test              # 20 tests for the API client and formatting
+cd backend && python -m qa.mutation_check   # breaks 38 rules on purpose and checks the tests notice
+cd backend && TEST_DATABASE_URL=postgresql+psycopg://user@host:5432/db TEST_REDIS_URL=redis://host:6379/0 pytest   # the same tests on a real Postgres and Redis (the database is emptied between tests: use a throwaway one)
 ```
 
-They cover the customer No path, the Yes path, a failed verification, the 3-minute re-alert and 10-minute escalation, a routine release, an immediate block, the CAMARA mock, and the Gemini to Meta to mock fallback.
+`.github/workflows/ci.yml` (at the repository root) runs all of this on every push: backend lint and tests with an 85% coverage floor, the static scan and dependency audits, the frontend tests and build, and the browser suite. It also runs weekly, with the mutation check, because new advisories appear without any code change.
+
+`docs/TEST_PLAN.md` is the plan and `docs/TEST_REPORT.md` the result: counts, coverage, defects found, and what the tests cannot prove.
+
+## Database changes
+
+The database schema is versioned with Alembic scripts in `backend/app/migrate/versions/`. At startup the service builds an empty
+database from the models, brings a database from before migrations up to date and marks it, or runs the scripts a database is behind on.
+After you change a model, write the script with:
+
+```bash
+cd backend
+python -m app.migrate new "what changed"
+```
+
+It writes nothing when the models and scripts already agree. Read the script it writes before committing it. A test fails if a model
+changes without a script, and another upgrades an older database and checks its data survives. The scripts are checked against the
+models on SQLite and on Postgres.
 
 ## Face verification
 
@@ -159,7 +179,9 @@ Set `FACE_ENGINE=legacy` to use the old two-frame demo check (no recognition), a
 | Agent limits | Each agent has a charter (`backend/app/charters.py`). A tool call outside it is refused in code. |
 | Model privacy | Phone, email, account and NIC numbers are masked before any text reaches a model. Text that carries a password, answer or code is refused. |
 | Audit | Every operator action is in a hash chain (SHA-256 of the previous entry). The Security page re-checks the chain. |
-| Startup | With `APP_ENV=production` the backend will not start on development secrets or with `DEMO_ASSIST` on. |
+| Startup | With `APP_ENV=production` the backend will not start on development secrets, with `DEMO_ASSIST` on, or unless `ALLOWED_ORIGINS` lists the real `https://` address of the site. |
+| Monitoring | `GET /api/ready` is a health check that fails when the database, the checkpointer or the reminder timers are down. `GET /api/ops/metrics` gives operators the numbers to alert on (held money age, unanswered customers, agent errors, failed notifications, rate-limit blocks, audit chain), as JSON or Prometheus text. Every response has an `X-Request-ID`; `LOG_FORMAT=json` writes structured logs; tokens and passwords are blanked from every log line. See `docs/RUNBOOK.md`. |
+| Browser access | Only the sites in `ALLOWED_ORIGINS` may call the API from a browser (the local front end by default). Credentials and cookies are never allowed; sign-in is a bearer token. Only GET, POST and OPTIONS are accepted. |
 
 The selfie check compares two frames from the live camera. It is a demonstration check, not bank-grade face liveness.
 
@@ -178,13 +200,15 @@ Every row below is code that runs, not a message. The **Simulate** page has one 
 
 ## Demo script
 
+For the full presenter pack (modes, setup, a ten-step script, what each status means, measured limits and what is still unverified) see `docs/DEMO_GUIDE.md`. The architecture is in `docs/ARCHITECTURE_MAP.md` and the expected-against-observed scenario table is `docs/SCENARIO_MATRIX.md`.
+
 Sign in on the console as `analyst@payshield.lk` / `pilot-analyst`.
 
 1. Open **Demo control**. Leave the customer on Nimal Perera and the scenario on **SIM swap and Rs. 200,000 to a new payee**. Trigger the case.
 2. Open **Live Agent Activity**. Telecom and banking run together, risk scores, the rule layer holds the transfer, and the alert lane waits. Click a step. The details pane shows the tool arguments and the result.
 3. On a phone, or another window, open http://localhost:3000/c and choose **Register**. Demo control shows the registration details for the chosen customer (name, email, NIC, mobile, account number). Type them in, take the face scan, and choose a password. Any detail that does not match the BankCylone record is refused.
 4. The question is **Did you make this payment of Rs. 200,000 to K.D. Enterprises?**
-5. **No** blocks the transfer, asks the mock operator for a SIM freeze, limits the account, and files a report. **Yes** asks for the first school (`Royal College`) and the city of birth (`Galle`) before release. A wrong answer blocks.
+5. **No** blocks the transfer, records a *simulated* SIM-freeze request (no operator is contacted), limits the account, and files a report. **Yes** asks for a live face scan first. After a match (or a likely match) the customer answers rounds of three security questions (for the demo customer: first school `Royal College`, city of birth `Galle`). A mismatching second scan, or a fourth failed round, blocks the payment. An unsure scan gets one more try and then goes to a person with the money held. Before any release the rules read the signals once more and stop the release if something worse has arrived.
 6. Download the report from the case file or from **Reports** (markdown or PDF).
 7. To show the other rules without waiting: **Port-out, password reset, and Rs. 800,000** blocks immediately. **Routine bill of Rs. 4,850** on Dilani Wijesinghe releases without asking.
 8. **Run the 3-minute re-alert now** and **Run the 10-minute escalation now** call the same handlers the timer uses. Left alone, the realert is at 3 minutes and escalation at 10, and the transfer stays held.
