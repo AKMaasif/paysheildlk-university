@@ -108,11 +108,13 @@ export default function CaseDetailPage() {
                 { label: "Arguments", value: <pre className="pre">{JSON.stringify(event.tool_args || {}, null, 2)}</pre> },
                 { label: "Result", value: humanizeResult(event.result_summary || event.message) || "—" },
                 { label: "Provider", value: event.provider || "—" },
+                { label: "Structured result", value: <pre className="pre">{JSON.stringify(event.result || {}, null, 2)}</pre> },
+                { label: "Trace", value: <pre className="pre">{JSON.stringify({ phase: event.phase || "single event", call_id: event.call_id, ...(event.meta || {}) }, null, 2)}</pre> },
               ],
             })}
           >
             <div className="when">{colombo(event.created_at)} · {event.agent} · {event.tool_name || event.state}</div>
-            <div>{humanizeResult(event.result_summary || event.message)}</div>
+            <div>{event.phase === "started" ? "in progress, no result yet" : humanizeResult(event.result_summary || event.message)}</div>
           </div>
         ))}
       </div>
