@@ -29,7 +29,7 @@ export function SriLankaMap({
   return (
     <MapContainer center={[7.6, 80.7]} zoom={7} style={{ height: "100%", width: "100%" }}>
       <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      {showCustomers && customers.map((customer) => (
+      {showCustomers && customers.filter((c) => c.lat != null && c.lng != null).map((customer) => (
         <CircleMarker
           key={customer.id}
           center={[customer.lat, customer.lng]}
@@ -48,7 +48,7 @@ export function SriLankaMap({
           <Popup>{customer.name}<br />{customer.district}</Popup>
         </CircleMarker>
       ))}
-      {showEvents && events.map((event) => (
+      {showEvents && events.filter((e) => e.lat != null && e.lng != null).map((event) => (
         <CircleMarker
           key={event.id}
           center={[event.lat + 0.05, event.lng + 0.05]}
