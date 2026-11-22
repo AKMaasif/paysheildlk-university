@@ -73,6 +73,9 @@ export class ApiError extends Error {
   }
 }
 
+// These answer 401 for "the password you typed is wrong", not "your session ended".
+const credentialCheck = (path: string) => path.startsWith("/api/auth/") || path === "/api/customer/password";
+
 export async function api<T = unknown>(
   path: string,
   options: RequestInit & { portal?: Portal; raw?: boolean } = {},
@@ -86,13 +89,13 @@ export async function api<T = unknown>(
   const token = getToken(portal);
   if (token && !explicitAuth) headers.set("Authorization", `Bearer ${token}`);
   let response = await fetch(`/backend${path}`, { ...options, headers });
-  if (response.status === 401 && typeof window !== "undefined" && !explicitAuth && !path.startsWith("/api/auth/")) {
+  if (response.status === 401 && typeof window !== "undefined" && !explicitAuth && !credentialCheck(path)) {
     if (await renewAccess(portal)) {
       headers.set("Authorization", `Bearer ${getToken(portal)}`);
       response = await fetch(`/backend${path}`, { ...options, headers });
     }
   }
-  if (response.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/auth/")) {
+  if (response.status === 401 && typeof window !== "undefined" && !credentialCheck(path)) {
     clearToken(portal);
     const target = portal === "customer" ? "/c/login" : "/signin";
     if (!window.location.pathname.startsWith(target)) window.location.href = target;
