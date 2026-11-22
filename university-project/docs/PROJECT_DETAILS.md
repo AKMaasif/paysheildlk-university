@@ -38,7 +38,7 @@
 | Backend | Python 3.12, FastAPI, SQLAlchemy, Pydantic |
 | Agents | LangGraph supervisor graph with `interrupt()` and a Postgres or SQLite checkpointer |
 | Data | PostgreSQL in Docker, SQLite when run locally; Redis for live events with an in-memory fallback |
-| Frontend | Next.js 14 and React 18, hand-written SVG charts |
+| Frontend | Next.js 15 and React 18, hand-written SVG charts |
 | Reports | fpdf2 PDF, SHA-256 fingerprint stored with each report |
 | Tests | pytest on the backend, including prompt-injection, evaluation and MCP tests |
 
