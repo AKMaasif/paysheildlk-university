@@ -9,6 +9,7 @@ import { api, getUser } from "@/lib/api";
 type Scenario = { id: string; group: string; title: string; expect: string };
 type Customer = { id: string; name: string; district: string };
 type Listing = {
+  drills_enabled: boolean;
   scenarios: Scenario[];
   faults: Record<string, { detail: string; meaning: string }>;
   emergency: { active: Record<string, string>; hold_above_lkr: number };
@@ -91,6 +92,7 @@ export default function SimulatePage() {
     <>
       <PageHeader crumb="Assure / Simulate" title="Simulate" subtitle="One button per scenario. Each one runs the real agents and rules, and every run is written to the audit log." chip={active ? "DRILL ACTIVE" : "READY"} />
       {!canWrite && data && <Note>Your role can read this page but not run scenarios.</Note>}
+      {data && !data.drills_enabled && <Note>Drills are switched off on this system, so there are no scenario buttons. The emergency switch below is a real control and still works.</Note>}
       {error && <Note tone="warn">{error}</Note>}
 
       {active && (
@@ -114,14 +116,14 @@ export default function SimulatePage() {
         </div>
       )}
 
-      <div className="card" style={{ marginBottom: 12 }}>
+      {(!data || data.drills_enabled) && <div className="card" style={{ marginBottom: 12 }}>
         <label className="field" style={{ maxWidth: 360 }}>
           <span>Run as customer</span>
           <select value={customer} onChange={(event) => setCustomer(event.target.value)}>
             {(data?.customers || []).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.district}</option>)}
           </select>
         </label>
-      </div>
+      </div>}
 
       {groups.map((group) => (
         <section key={group} style={{ marginBottom: 12 }}>
