@@ -5,7 +5,7 @@
   --cs-ink: #10201f;
   --cs-text: #1d2927;
   --cs-muted: #5b6866;
-  --cs-faint: #8a9593;
+  --cs-faint: #637170;
   --cs-paper: #f6f4ee;
   --cs-card: #ffffff;
   --cs-line: #e2ddd0;
@@ -204,7 +204,7 @@
 .cs-input.bad { border-color: var(--cs-red); }
 .cs-pw { position: relative; }
 .cs-pw .cs-input { padding-right: 70px; }
-.cs-pw button { position: absolute; right: 8px; top: 8px; height: 32px; padding: 0 10px; border: 0; background: transparent; color: var(--cs-teal); font: 600 13.5px var(--cs-sans); cursor: pointer; border-radius: 6px; }
+.cs-pw button { position: absolute; right: 6px; top: 4px; height: 40px; padding: 0 10px; border: 0; background: transparent; color: var(--cs-teal); font: 600 13.5px var(--cs-sans); cursor: pointer; border-radius: 6px; }
 .cs-pw button:hover { background: var(--cs-teal-wash); }
 .cs-error { background: var(--cs-red-wash); color: var(--cs-red); border: 1px solid #f0c4be; padding: 12px 14px; border-radius: 8px; font-size: 14.5px; margin-bottom: 16px; }
 .cs-ok { background: var(--cs-green-wash); color: var(--cs-green); border: 1px solid #bfe0cd; padding: 12px 14px; border-radius: 8px; font-size: 14.5px; margin-bottom: 16px; }
@@ -340,3 +340,6 @@
 
 .cs-hints { margin: 12px 0 0; padding: 12px 14px 12px 30px; background: var(--cs-amber-wash); color: #6d4600; border: 1px solid #ecd9a8; border-radius: 8px; font-size: 14.5px; }
 .cs-hints li { margin: 3px 0; }
+
+/* Links inside a line of text must not rely on colour alone. */
+.cs-auth-top a, .cs-switch a, .cs-narrow p a, .cs-faq a { text-decoration: underline; text-underline-offset: 3px; }
