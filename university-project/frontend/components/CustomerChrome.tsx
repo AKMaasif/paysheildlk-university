@@ -126,7 +126,7 @@ export function AppBar({ name }: { name?: string }) {
         <nav className="cs-appnav" aria-label="Account">
           <Link href="/c/home" className={path === "/c/home" ? "on" : ""}>My account</Link>
           <Link href="/c/password" className={path === "/c/password" ? "on" : ""}>Password</Link>
-          {name && <span style={{ color: "#8fb1ac", fontSize: 13.5, padding: "0 8px" }}>{name.split(" ")[0]}</span>}
+          {name && <span style={{ color: "#c4dcd8", fontSize: 13.5, padding: "0 8px" }}>{name.split(" ")[0]}</span>}
           <button onClick={signOut}>Sign out</button>
         </nav>
       </div>
