@@ -74,15 +74,15 @@ export function LiveTerminal({
   return (
     <section className={`term ${collapsed ? "collapsed" : ""}`}>
       <header className="term-bar">
-        <span className={`term-live ${follow ? "on" : ""}`}><i />{follow ? "live" : "paused"}</span>
+        <span className={`term-live ${follow ? "on" : ""}`} title="This only controls whether the view scrolls with new lines. The backend keeps working either way."><i />{follow ? "live" : "not following"}</span>
         <div className="term-filters">
           {FILTERS.map((item) => (
             <button key={item.id} className={filter === item.id ? "on" : ""} onClick={() => setFilter(item.id)}>{item.label}</button>
           ))}
         </div>
         <div className="term-actions">
-          <button onClick={() => setFollow((value) => !value)}>{follow ? "Pause" : "Follow"}</button>
-          <button onClick={() => setClearedAt(events.at(-1)?.created_at || new Date().toISOString())}>Clear</button>
+          <button onClick={() => setFollow((value) => !value)} title="Stop or resume scrolling with new lines. Processing is not paused.">{follow ? "Stop following" : "Follow"}</button>
+          <button onClick={() => setClearedAt(events.at(-1)?.created_at || new Date().toISOString())} title="Hides the lines in this view only. The case history is kept.">Clear view</button>
           <button onClick={copy}>{copied ? "Copied" : "Copy"}</button>
           <button onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Open" : "Hide"}</button>
         </div>
