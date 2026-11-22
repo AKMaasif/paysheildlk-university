@@ -80,7 +80,8 @@ export default function LivePage() {
   const latestByAgent = new Map<string, LiveEvent>();
   caseEvents.forEach((event) => latestByAgent.set(event.agent, event));
 
-  const waiting = selected && (selected.status === "waiting_customer" || selected.status === "waiting_verification");
+  const waiting = selected && (selected.status === "waiting_customer" || selected.status === "waiting_liveness" || selected.status === "waiting_verification");
+  const phaseLabel = selected?.status === "waiting_liveness" ? "face scan" : selected?.status === "waiting_verification" ? "security answers" : "yes or no";
   const realertMs = (health?.realert_seconds || 180) * 1000;
   const escalateMs = (health?.escalate_seconds || 600) * 1000;
   const started = selected?.waiting_since ? new Date(selected.waiting_since).getTime() : 0;
@@ -100,6 +101,8 @@ export default function LivePage() {
         { label: "Provider", value: event.provider ? `${event.provider}${event.fell_back ? " (fallback)" : ""}` : "—" },
         { label: "Latency", value: event.latency_ms != null ? `${event.latency_ms} ms` : "—" },
         { label: "Case", value: event.case_id },
+        { label: "Structured result", value: <pre className="pre">{JSON.stringify(event.result || {}, null, 2)}</pre> },
+        { label: "Trace", value: <pre className="pre">{JSON.stringify({ phase: event.phase || "single event", call_id: event.call_id, ...(event.meta || {}) }, null, 2)}</pre> },
       ],
     });
   }
@@ -127,9 +130,9 @@ export default function LivePage() {
       </Note>
       {waiting && selected && (
         <div className="wait-line">
-          <span>Waiting for the customer · {selected.customer_name} · {lkr(selected.amount_lkr)} to {selected.payee}</span>
+          <span>Waiting for the customer ({phaseLabel}) since {colombo(selected.waiting_since || "")} · {selected.customer_name} · {lkr(selected.amount_lkr)} to {selected.payee}</span>
           <span>
-            {selected.alert_count < 2 ? <>Re-alert in <strong>{mmss(realertMs - elapsed)}</strong> · </> : <>Reminder sent · </>}
+            {selected.alert_count < 2 ? <>Re-alert in <strong>{mmss(realertMs - elapsed)}</strong> · </> : <>{selected.alert_count - 1} reminder{selected.alert_count > 2 ? "s" : ""} sent · </>}
             Escalate in <strong>{mmss(escalateMs - elapsed)}</strong>
           </span>
         </div>
