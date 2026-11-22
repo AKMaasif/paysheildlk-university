@@ -29,6 +29,7 @@ export function FaceCapture({
   const stream = useRef<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState("");
   const [running, setRunning] = useState(false);
+  const [ready, setReady] = useState(false);
   const [instruction, setInstruction] = useState("");
   const [progress, setProgress] = useState(0);
 
@@ -98,7 +99,7 @@ export function FaceCapture({
   return (
     <div>
       <div className="cs-camera">
-        {cameraError ? <div className="off">{cameraError}</div> : <video ref={video} autoPlay playsInline muted />}
+        {cameraError ? <div className="off">{cameraError}</div> : <video ref={video} autoPlay playsInline muted onPlaying={() => setReady(true)} />}
         {!cameraError && <div className="ring" />}
         {(running || instruction) && <div className="hint" style={{ fontSize: 16, fontWeight: 600 }}>{instruction}</div>}
         {running && <div style={{ position: "absolute", left: 0, bottom: 0, height: 4, width: `${progress * 100}%`, background: "var(--cs-mint)" }} />}
@@ -113,8 +114,8 @@ export function FaceCapture({
           You will be asked to: <b>{challenge.instructions.join(", then ").toLowerCase()}</b>. Keep your face in the oval and your eyes open. The instructions change every time.
         </p>
       )}
-      <button className="cs-btn primary block" style={{ marginTop: 14 }} type="button" onClick={start} disabled={running || busy || !!cameraError}>
-        {running ? "Scanning, keep going" : busy ? "Checking" : label}
+      <button className="cs-btn primary block" style={{ marginTop: 14 }} type="button" onClick={start} disabled={running || busy || !ready || !!cameraError}>
+        {running ? "Scanning, keep going" : busy ? "Checking" : !ready && !cameraError ? "Starting the camera" : label}
       </button>
     </div>
   );
