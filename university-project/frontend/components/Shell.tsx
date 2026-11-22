@@ -49,13 +49,23 @@ export type LiveEvent = {
   latency_ms?: number | null;
   message?: string | null;
   created_at: string;
+  // A tool call is a "started" event and then a "finished" or "failed" one with the same call_id. "retrying" marks a repeat.
+  phase?: "started" | "finished" | "failed" | "retrying" | null;
+  call_id?: string | null;
+  result?: Record<string, unknown> | null;
+  meta?: { planner?: string; why?: string; run_id?: string | null; transaction_id?: string | null; attempt?: number; attempts?: number; delivery_state?: string } | null;
 };
 
 type Health = {
   ok: boolean;
   redis: string;
   sms: string;
+  email?: string;
   telco?: string;
+  mode?: string;
+  mode_note?: string;
+  ignored_by_mode?: string[];
+  recipients_cleared?: { phones: number; emails: number };
   realert_seconds?: number;
   escalate_seconds?: number;
   llm: { primary: string; gemini_configured: boolean; meta_configured: boolean };
@@ -237,6 +247,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
     .toUpperCase();
   const smsLabel = health?.sms === "textlk" ? "Text.lk" : "log-only";
   const telcoLabel = health?.telco || "simulated CAMARA";
+  const emailLabel = health?.email === "smtp" ? "SMTP" : "log-only";
+  const modeLabel = health?.mode || "deterministic";
+  const modeDetail = [health?.mode_note, health?.ignored_by_mode?.length ? `Credentials present but ignored in this mode: ${health.ignored_by_mode.join(", ")}.` : "", health?.recipients_cleared ? `Test recipients cleared: ${health.recipients_cleared.phones} phone(s), ${health.recipients_cleared.emails} email(s).` : ""].filter(Boolean).join(" ");
 
   return (
     <ShellContext.Provider value={value}>
@@ -296,7 +309,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <button className="signout" onClick={signOut}>Sign out</button>
           </header>
           <div className="body-row">
-            <main className="main">{children}</main>
+            <main className="main" tabIndex={0} aria-label="Page content">{children}</main>
             {details && (
               <aside className="details">
                 <div className="details-head">
@@ -317,12 +330,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
             )}
           </div>
           <footer className="statusbar">
+            <span title={modeDetail} data-testid="demo-mode"><i className="dot" /> Mode <strong>{modeLabel}</strong></span>
             <span><i className="dot" /> Updated {now}</span>
             <span><i className="dot" /> Live events {health?.redis === "connected" ? "redis" : "in-process"}</span>
             <span><i className="dot" /> AI {offline ? "offline rules" : health?.llm.primary}</span>
             <span><i className="dot" /> Telco {telcoLabel}</span>
             <span><i className="dot" /> SMS {smsLabel}</span>
-            <span className="spacer">Simulated network. Not connected to a live bank or operator.</span>
+            <span><i className="dot" /> Email {emailLabel}</span>
+            <span className="spacer">{modeLabel === "production" ? "Live deployment." : "Demonstration. The bank ledger is synthetic and a SIM freeze is only recorded, never sent to an operator."}</span>
           </footer>
         </div>
       </div>
