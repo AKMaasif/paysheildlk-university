@@ -1,0 +1,168 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1" # Mondays: new advisories appear without any code change
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: university-project
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            university-project/backend/requirements.txt
+            university-project/backend/requirements-dev.txt
+      - name: Install
+        working-directory: university-project/backend
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Lint (errors, unused code, import order, likely bugs, security, hidden characters)
+        working-directory: university-project/backend
+        run: ruff check app qa evaluation tests
+      - name: Tests with coverage (the build fails under 85% of lines)
+        working-directory: university-project/backend
+        run: python -m pytest -q --cov=app --cov-branch --cov-fail-under=85 --cov-report=json:coverage.json
+      - name: Coverage per agent
+        working-directory: university-project/backend
+        run: python qa/coverage_by_agent.py coverage.json
+      - name: Static scan (fails on a medium or high finding)
+        working-directory: university-project/backend
+        run: bandit -q -r app --severity-level medium
+      - name: Dependency audit
+        working-directory: university-project/backend
+        run: pip-audit -r requirements.txt
+
+  backend-postgres:
+    # The same tests against a real Postgres (data, checkpoints) and Redis (live events). SQLite accepts things Postgres refuses.
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: payshield
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: payshield_test
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U payshield" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6380:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://payshield@localhost:5433/payshield_test
+      TEST_REDIS_URL: redis://localhost:6380/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: university-project/backend/requirements.txt
+      - name: Install
+        working-directory: university-project/backend
+        run: pip install -r requirements.txt
+      - name: Tests on Postgres and Redis
+        working-directory: university-project/backend
+        run: python -m pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: university-project/frontend/package-lock.json
+      - name: Install
+        working-directory: university-project/frontend
+        run: npm ci
+      - name: Logic tests
+        working-directory: university-project/frontend
+        run: npm test
+      - name: Type check and build
+        working-directory: university-project/frontend
+        run: npm run build
+      - name: Dependency audit (fails on a high or critical advisory)
+        working-directory: university-project/frontend
+        run: npm audit --omit=dev --audit-level=high
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: university-project/backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            university-project/frontend/package-lock.json
+            university-project/e2e/package-lock.json
+      - name: Install the backend
+        working-directory: university-project/backend
+        run: pip install -r requirements.txt
+      - name: Install the frontend
+        working-directory: university-project/frontend
+        run: npm ci
+      - name: Install the browser tests and Chromium
+        working-directory: university-project/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Browser tests (desktop, tablet, phone, accessibility)
+        working-directory: university-project/e2e
+        env:
+          E2E_LOGS: ${{ runner.temp }}/e2e-logs
+        run: |
+          mkdir -p "$E2E_LOGS"
+          node run.mjs
+      - name: Keep the server logs when a test fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: ${{ runner.temp }}/e2e-logs
+
+  mutation:
+    # Slow (about ten minutes), so it runs on the weekly schedule and on request, not on every push.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: university-project/backend/requirements.txt
+      - name: Install
+        working-directory: university-project/backend
+        run: pip install -r requirements.txt
+      - name: Break 38 rules on purpose; every one must be caught
+        working-directory: university-project/backend
+        run: python -m qa.mutation_check
