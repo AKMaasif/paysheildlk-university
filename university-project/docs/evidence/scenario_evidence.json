@@ -1,0 +1,1687 @@
+[
+  {
+    "scenario": "sim_swap_transfer (verified)",
+    "expectation": {
+      "case_status": "closed_released",
+      "payment_status": "released",
+      "debit": true
+    },
+    "rules": {
+      "rules_decision": "hold",
+      "rules_score": 100
+    },
+    "observed": {
+      "case_status": "closed_released",
+      "payment_status": "released",
+      "amount_lkr": 200000,
+      "balance_change_lkr": -200000,
+      "score": 100,
+      "decision": "hold",
+      "reason": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
+      "snapshot_digest": "6aae82b0316c8dbc",
+      "factors": [
+        "sim_swap_24h",
+        "new_imei",
+        "location",
+        "new_payee",
+        "amount_100k",
+        "new_device_login"
+      ],
+      "tools_in_order": [
+        "create_case",
+        "verify_handoff",
+        "verify_handoff",
+        "get_recent_transactions",
+        "get_sim_swap_status",
+        "get_customer_profile",
+        "get_device_change",
+        "get_location_events",
+        "get_payee_history",
+        "get_port_out_status",
+        "get_credential_events",
+        "get_sim_history",
+        "verify_handoff",
+        "verify_handoff",
+        "compute_risk_score",
+        "verify_handoff",
+        "compute_risk_score",
+        "hold_transaction",
+        "verify_handoff",
+        "send_push",
+        "send_email",
+        "send_sms",
+        "verify_handoff",
+        "liveness_check",
+        "ask_security_questions",
+        "verify_handoff",
+        "revalidate_before_release",
+        "release_transaction",
+        "verify_handoff",
+        "review_notes",
+        "generate_report",
+        "deliver_report"
+      ],
+      "handoffs": [
+        "supervisor->telecom",
+        "supervisor->banking",
+        "banking->risk",
+        "telecom->risk",
+        "risk->policy",
+        "policy->alert",
+        "alert->customer",
+        "alert->customer",
+        "customer->verification"
+      ],
+      "notifications": [
+        {
+          "channel": "push",
+          "title": "Confirm a payment",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Confirm a payment in PayShield",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "push",
+          "title": "Payment update",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Payment update",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "email",
+          "title": "Your PayShield receipt PS-26-00046",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "push",
+          "title": "Your receipt is ready",
+          "delivery": "inbox_stored"
+        }
+      ],
+      "alert_attempts": [
+        {
+          "tool": "send_push",
+          "state": "calling_tool",
+          "result": {
+            "channel": "push",
+            "in_app": "stored",
+            "notification_id": "ntf_aff5003248",
+            "fcm": "skipped",
+            "devices": 0,
+            "delivery": {
+              "state": "inbox_stored",
+              "channel": "push",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Stored in the PayShield inbox. No push provider is in use."
+            },
+            "latency_ms": 2
+          }
+        },
+        {
+          "tool": "send_email",
+          "state": "calling_tool",
+          "result": {
+            "channel": "email",
+            "status": "logged",
+            "driver": "log",
+            "to": "[email]",
+            "notification_id": "ntf_361655d0aa",
+            "attachments": [],
+            "delivery": {
+              "state": "logged_only",
+              "channel": "email",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No email was sent."
+            },
+            "latency_ms": 2,
+            "attempts": 1
+          }
+        },
+        {
+          "tool": "send_sms",
+          "state": "calling_tool",
+          "result": {
+            "channel": "sms",
+            "status": "logged",
+            "driver": "log",
+            "to": "[phone ..83]",
+            "notification_id": "ntf_003f165b78",
+            "delivery": {
+              "state": "logged_only",
+              "channel": "sms",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No SMS was sent."
+            },
+            "latency_ms": 2,
+            "attempts": 1
+          }
+        }
+      ],
+      "events": 74
+    },
+    "notes": "customer said yes, passed the face scan and the questions",
+    "problems": []
+  },
+  {
+    "scenario": "sim_swap_transfer (customer says no)",
+    "expectation": {
+      "case_status": "closed_blocked",
+      "payment_status": "blocked",
+      "debit": false
+    },
+    "rules": {
+      "rules_decision": "hold",
+      "rules_score": 100
+    },
+    "observed": {
+      "case_status": "closed_blocked",
+      "payment_status": "blocked",
+      "amount_lkr": 200000,
+      "balance_change_lkr": 0,
+      "score": 100,
+      "decision": "hold",
+      "reason": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
+      "snapshot_digest": "2661430359ccad63",
+      "factors": [
+        "sim_swap_24h",
+        "new_imei",
+        "location",
+        "new_payee",
+        "amount_100k",
+        "new_device_login"
+      ],
+      "tools_in_order": [
+        "create_case",
+        "verify_handoff",
+        "verify_handoff",
+        "get_recent_transactions",
+        "get_sim_swap_status",
+        "get_customer_profile",
+        "get_device_change",
+        "get_location_events",
+        "get_payee_history",
+        "get_port_out_status",
+        "get_credential_events",
+        "get_sim_history",
+        "verify_handoff",
+        "verify_handoff",
+        "compute_risk_score",
+        "verify_handoff",
+        "compute_risk_score",
+        "hold_transaction",
+        "verify_handoff",
+        "send_push",
+        "send_email",
+        "send_sms",
+        "verify_handoff",
+        "block_transaction",
+        "request_sim_freeze",
+        "lock_account",
+        "verify_handoff",
+        "review_notes",
+        "generate_report",
+        "deliver_report"
+      ],
+      "handoffs": [
+        "supervisor->telecom",
+        "supervisor->banking",
+        "banking->risk",
+        "telecom->risk",
+        "risk->policy",
+        "policy->alert",
+        "alert->customer",
+        "alert->customer",
+        "response->case"
+      ],
+      "notifications": [
+        {
+          "channel": "push",
+          "title": "Confirm a payment",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Confirm a payment in PayShield",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "push",
+          "title": "Payment blocked",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Payment blocked",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "email",
+          "title": "Your PayShield receipt PS-26-00046",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "push",
+          "title": "Your receipt is ready",
+          "delivery": "inbox_stored"
+        }
+      ],
+      "alert_attempts": [
+        {
+          "tool": "send_push",
+          "state": "calling_tool",
+          "result": {
+            "channel": "push",
+            "in_app": "stored",
+            "notification_id": "ntf_9b413cf8d7",
+            "fcm": "skipped",
+            "devices": 0,
+            "delivery": {
+              "state": "inbox_stored",
+              "channel": "push",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Stored in the PayShield inbox. No push provider is in use."
+            },
+            "latency_ms": 2
+          }
+        },
+        {
+          "tool": "send_email",
+          "state": "calling_tool",
+          "result": {
+            "channel": "email",
+            "status": "logged",
+            "driver": "log",
+            "to": "[email]",
+            "notification_id": "ntf_d1ad3d44b9",
+            "attachments": [],
+            "delivery": {
+              "state": "logged_only",
+              "channel": "email",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No email was sent."
+            },
+            "latency_ms": 2,
+            "attempts": 1
+          }
+        },
+        {
+          "tool": "send_sms",
+          "state": "calling_tool",
+          "result": {
+            "channel": "sms",
+            "status": "logged",
+            "driver": "log",
+            "to": "[phone ..83]",
+            "notification_id": "ntf_036f77aa88",
+            "delivery": {
+              "state": "logged_only",
+              "channel": "sms",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No SMS was sent."
+            },
+            "latency_ms": 2,
+            "attempts": 1
+          }
+        }
+      ],
+      "events": 73
+    },
+    "notes": "customer said they did not make it",
+    "problems": []
+  },
+  {
+    "scenario": "sim_swap_transfer (face scan fails)",
+    "expectation": {
+      "payment_status_not": "released",
+      "debit": false
+    },
+    "rules": {
+      "rules_decision": "hold",
+      "rules_score": 100
+    },
+    "observed": {
+      "case_status": "waiting_liveness",
+      "payment_status": "held",
+      "amount_lkr": 200000,
+      "balance_change_lkr": 0,
+      "score": 100,
+      "decision": "hold",
+      "reason": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
+      "snapshot_digest": "bcfe27bdbfc4c122",
+      "factors": [
+        "sim_swap_24h",
+        "new_imei",
+        "location",
+        "new_payee",
+        "amount_100k",
+        "new_device_login"
+      ],
+      "tools_in_order": [
+        "create_case",
+        "verify_handoff",
+        "verify_handoff",
+        "get_recent_transactions",
+        "get_sim_swap_status",
+        "get_customer_profile",
+        "get_device_change",
+        "get_location_events",
+        "get_payee_history",
+        "get_port_out_status",
+        "get_credential_events",
+        "get_sim_history",
+        "verify_handoff",
+        "verify_handoff",
+        "compute_risk_score",
+        "verify_handoff",
+        "compute_risk_score",
+        "hold_transaction",
+        "verify_handoff",
+        "send_push",
+        "send_email",
+        "send_sms",
+        "verify_handoff",
+        "liveness_check"
+      ],
+      "handoffs": [
+        "supervisor->telecom",
+        "supervisor->banking",
+        "banking->risk",
+        "telecom->risk",
+        "risk->policy",
+        "policy->alert",
+        "alert->customer",
+        "alert->customer",
+        "customer->verification"
+      ],
+      "notifications": [
+        {
+          "channel": "push",
+          "title": "Confirm a payment",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Confirm a payment in PayShield",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        }
+      ],
+      "alert_attempts": [
+        {
+          "tool": "send_push",
+          "state": "calling_tool",
+          "result": {
+            "channel": "push",
+            "in_app": "stored",
+            "notification_id": "ntf_5b09ce1e2d",
+            "fcm": "skipped",
+            "devices": 0,
+            "delivery": {
+              "state": "inbox_stored",
+              "channel": "push",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Stored in the PayShield inbox. No push provider is in use."
+            },
+            "latency_ms": 3
+          }
+        },
+        {
+          "tool": "send_email",
+          "state": "calling_tool",
+          "result": {
+            "channel": "email",
+            "status": "logged",
+            "driver": "log",
+            "to": "[email]",
+            "notification_id": "ntf_92a02f40bf",
+            "attachments": [],
+            "delivery": {
+              "state": "logged_only",
+              "channel": "email",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No email was sent."
+            },
+            "latency_ms": 3,
+            "attempts": 1
+          }
+        },
+        {
+          "tool": "send_sms",
+          "state": "calling_tool",
+          "result": {
+            "channel": "sms",
+            "status": "logged",
+            "driver": "log",
+            "to": "[phone ..83]",
+            "notification_id": "ntf_0d66844bb9",
+            "delivery": {
+              "state": "logged_only",
+              "channel": "sms",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No SMS was sent."
+            },
+            "latency_ms": 3,
+            "attempts": 1
+          }
+        }
+      ],
+      "events": 59
+    },
+    "notes": "face scan failed",
+    "problems": []
+  },
+  {
+    "scenario": "port_out_critical",
+    "expectation": {
+      "case_status": "closed_blocked",
+      "payment_status": "blocked",
+      "debit": false
+    },
+    "rules": {
+      "rules_decision": "block",
+      "rules_score": 100
+    },
+    "observed": {
+      "case_status": "closed_blocked",
+      "payment_status": "blocked",
+      "amount_lkr": 800000,
+      "balance_change_lkr": 0,
+      "score": 100,
+      "decision": "block",
+      "reason": "Rule: an open port-out, a password reset within 6 hours, a new payee, and a transfer of at least Rs. 500,000. The transfer is blocked without waiting.",
+      "snapshot_digest": "f2376b02ffe13106",
+      "factors": [
+        "sim_swap_24h",
+        "port_out",
+        "new_payee",
+        "amount_500k",
+        "password_reset"
+      ],
+      "tools_in_order": [
+        "create_case",
+        "verify_handoff",
+        "verify_handoff",
+        "get_recent_transactions",
+        "get_sim_swap_status",
+        "get_customer_profile",
+        "get_device_change",
+        "get_location_events",
+        "get_payee_history",
+        "get_port_out_status",
+        "get_credential_events",
+        "get_sim_history",
+        "verify_handoff",
+        "verify_handoff",
+        "compute_risk_score",
+        "verify_handoff",
+        "compute_risk_score",
+        "hold_transaction",
+        "verify_handoff",
+        "block_transaction",
+        "request_sim_freeze",
+        "lock_account",
+        "verify_handoff",
+        "review_notes",
+        "generate_report",
+        "deliver_report"
+      ],
+      "handoffs": [
+        "supervisor->telecom",
+        "supervisor->banking",
+        "banking->risk",
+        "telecom->risk",
+        "risk->policy",
+        "policy->response",
+        "response->case"
+      ],
+      "notifications": [
+        {
+          "channel": "push",
+          "title": "Payment blocked",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Payment blocked",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "email",
+          "title": "Your PayShield receipt PS-26-00046",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "push",
+          "title": "Your receipt is ready",
+          "delivery": "inbox_stored"
+        }
+      ],
+      "alert_attempts": [],
+      "events": 63
+    },
+    "notes": "block rule needs no customer input",
+    "problems": []
+  },
+  {
+    "scenario": "routine_payment",
+    "expectation": {
+      "case_status": "closed_cleared",
+      "payment_status": "released",
+      "debit": true
+    },
+    "rules": {
+      "rules_decision": "release",
+      "rules_score": 0
+    },
+    "observed": {
+      "case_status": "closed_cleared",
+      "payment_status": "released",
+      "amount_lkr": 4850,
+      "balance_change_lkr": -4850,
+      "score": 0,
+      "decision": "release",
+      "reason": "Rule: the signals do not meet the hold threshold. The transfer can proceed. A short case note is still filed.",
+      "snapshot_digest": "e58c21219f85084b",
+      "factors": [],
+      "tools_in_order": [
+        "create_case",
+        "verify_handoff",
+        "verify_handoff",
+        "get_recent_transactions",
+        "get_sim_swap_status",
+        "get_customer_profile",
+        "get_device_change",
+        "get_location_events",
+        "get_port_out_status",
+        "verify_handoff",
+        "verify_handoff",
+        "compute_risk_score",
+        "verify_handoff",
+        "compute_risk_score",
+        "verify_handoff",
+        "revalidate_before_release",
+        "release_transaction",
+        "verify_handoff",
+        "review_notes",
+        "generate_report",
+        "deliver_report"
+      ],
+      "handoffs": [
+        "supervisor->telecom",
+        "supervisor->banking",
+        "banking->risk",
+        "telecom->risk",
+        "risk->policy",
+        "policy->release"
+      ],
+      "notifications": [
+        {
+          "channel": "push",
+          "title": "Payment update",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Payment update",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "email",
+          "title": "Your PayShield receipt PS-26-00046",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "push",
+          "title": "Your receipt is ready",
+          "delivery": "inbox_stored"
+        }
+      ],
+      "alert_attempts": [],
+      "events": 49
+    },
+    "notes": "low risk, released by rules",
+    "problems": []
+  },
+  {
+    "scenario": "customer_silent",
+    "expectation": {
+      "case_status": "escalated",
+      "payment_status": "held",
+      "debit": false
+    },
+    "rules": {
+      "rules_decision": "hold",
+      "rules_score": 100
+    },
+    "observed": {
+      "case_status": "escalated",
+      "payment_status": "held",
+      "amount_lkr": 200000,
+      "balance_change_lkr": 0,
+      "score": 100,
+      "decision": "hold",
+      "reason": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
+      "snapshot_digest": "097b599bd1790a6e",
+      "factors": [
+        "sim_swap_24h",
+        "new_imei",
+        "location",
+        "new_payee",
+        "amount_100k",
+        "new_device_login"
+      ],
+      "tools_in_order": [
+        "create_case",
+        "verify_handoff",
+        "verify_handoff",
+        "get_recent_transactions",
+        "get_sim_swap_status",
+        "get_customer_profile",
+        "get_device_change",
+        "get_location_events",
+        "get_payee_history",
+        "get_port_out_status",
+        "get_credential_events",
+        "get_sim_history",
+        "verify_handoff",
+        "verify_handoff",
+        "compute_risk_score",
+        "verify_handoff",
+        "compute_risk_score",
+        "hold_transaction",
+        "verify_handoff",
+        "send_push",
+        "send_email",
+        "send_sms",
+        "send_push",
+        "verify_handoff",
+        "verify_handoff",
+        "review_notes",
+        "generate_report",
+        "deliver_report"
+      ],
+      "handoffs": [
+        "supervisor->telecom",
+        "supervisor->banking",
+        "banking->risk",
+        "telecom->risk",
+        "risk->policy",
+        "policy->alert",
+        "alert->customer",
+        "alert->customer",
+        "alert->case"
+      ],
+      "notifications": [
+        {
+          "channel": "push",
+          "title": "Confirm a payment",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Confirm a payment in PayShield",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "push",
+          "title": "Still waiting for you",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Still waiting for you",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "push",
+          "title": "Payment still on hold",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Payment still on hold",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "email",
+          "title": "Your PayShield receipt PS-26-00046",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "push",
+          "title": "Your receipt is ready",
+          "delivery": "inbox_stored"
+        }
+      ],
+      "alert_attempts": [
+        {
+          "tool": "send_push",
+          "state": "calling_tool",
+          "result": {
+            "channel": "push",
+            "in_app": "stored",
+            "notification_id": "ntf_e461be4c72",
+            "fcm": "skipped",
+            "devices": 0,
+            "delivery": {
+              "state": "inbox_stored",
+              "channel": "push",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Stored in the PayShield inbox. No push provider is in use."
+            },
+            "latency_ms": 1
+          }
+        },
+        {
+          "tool": "send_email",
+          "state": "calling_tool",
+          "result": {
+            "channel": "email",
+            "status": "logged",
+            "driver": "log",
+            "to": "[email]",
+            "notification_id": "ntf_abc3f659a9",
+            "attachments": [],
+            "delivery": {
+              "state": "logged_only",
+              "channel": "email",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No email was sent."
+            },
+            "latency_ms": 2,
+            "attempts": 1
+          }
+        },
+        {
+          "tool": "send_sms",
+          "state": "calling_tool",
+          "result": {
+            "channel": "sms",
+            "status": "logged",
+            "driver": "log",
+            "to": "[phone ..83]",
+            "notification_id": "ntf_bcd16ab357",
+            "delivery": {
+              "state": "logged_only",
+              "channel": "sms",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No SMS was sent."
+            },
+            "latency_ms": 2,
+            "attempts": 1
+          }
+        }
+      ],
+      "events": 69
+    },
+    "notes": "ACCELERATED: the clock was moved, not waited out",
+    "problems": []
+  },
+  {
+    "scenario": "models_down",
+    "expectation": {
+      "case_status": "waiting_customer",
+      "payment_status": "held",
+      "debit": false
+    },
+    "rules": {
+      "rules_decision": "hold",
+      "rules_score": 100
+    },
+    "observed": {
+      "case_status": "waiting_customer",
+      "payment_status": "held",
+      "amount_lkr": 200000,
+      "balance_change_lkr": 0,
+      "score": 100,
+      "decision": "hold",
+      "reason": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
+      "snapshot_digest": "0837bace59a3a9aa",
+      "factors": [
+        "sim_swap_24h",
+        "new_imei",
+        "location",
+        "new_payee",
+        "amount_100k",
+        "new_device_login"
+      ],
+      "tools_in_order": [
+        "create_case",
+        "verify_handoff",
+        "verify_handoff",
+        "get_recent_transactions",
+        "get_sim_swap_status",
+        "get_customer_profile",
+        "get_device_change",
+        "get_location_events",
+        "get_payee_history",
+        "get_port_out_status",
+        "get_credential_events",
+        "get_sim_history",
+        "verify_handoff",
+        "verify_handoff",
+        "compute_risk_score",
+        "verify_handoff",
+        "compute_risk_score",
+        "hold_transaction",
+        "verify_handoff",
+        "send_push",
+        "send_email",
+        "send_sms"
+      ],
+      "handoffs": [
+        "supervisor->telecom",
+        "supervisor->banking",
+        "banking->risk",
+        "telecom->risk",
+        "risk->policy",
+        "policy->alert",
+        "alert->customer",
+        "alert->customer"
+      ],
+      "notifications": [
+        {
+          "channel": "push",
+          "title": "Confirm a payment",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Confirm a payment in PayShield",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        }
+      ],
+      "alert_attempts": [
+        {
+          "tool": "send_push",
+          "state": "calling_tool",
+          "result": {
+            "channel": "push",
+            "in_app": "stored",
+            "notification_id": "ntf_d7f382ae8f",
+            "fcm": "skipped",
+            "devices": 0,
+            "delivery": {
+              "state": "inbox_stored",
+              "channel": "push",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Stored in the PayShield inbox. No push provider is in use."
+            },
+            "latency_ms": 2
+          }
+        },
+        {
+          "tool": "send_email",
+          "state": "calling_tool",
+          "result": {
+            "channel": "email",
+            "status": "logged",
+            "driver": "log",
+            "to": "[email]",
+            "notification_id": "ntf_[account ..73]f",
+            "attachments": [],
+            "delivery": {
+              "state": "logged_only",
+              "channel": "email",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No email was sent."
+            },
+            "latency_ms": 2,
+            "attempts": 1
+          }
+        },
+        {
+          "tool": "send_sms",
+          "state": "calling_tool",
+          "result": {
+            "channel": "sms",
+            "status": "logged",
+            "driver": "log",
+            "to": "[phone ..83]",
+            "notification_id": "ntf_f[account ..89]",
+            "delivery": {
+              "state": "logged_only",
+              "channel": "sms",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No SMS was sent."
+            },
+            "latency_ms": 2,
+            "attempts": 1
+          }
+        }
+      ],
+      "events": 55
+    },
+    "notes": "both model providers unreachable; rules decide",
+    "problems": []
+  },
+  {
+    "scenario": "channel_failure",
+    "expectation": {
+      "case_status": "waiting_customer",
+      "payment_status": "held",
+      "debit": false
+    },
+    "rules": {
+      "rules_decision": "hold",
+      "rules_score": 100
+    },
+    "observed": {
+      "case_status": "waiting_customer",
+      "payment_status": "held",
+      "amount_lkr": 200000,
+      "balance_change_lkr": 0,
+      "score": 100,
+      "decision": "hold",
+      "reason": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
+      "snapshot_digest": "1b50e65a2dce0357",
+      "factors": [
+        "sim_swap_24h",
+        "new_imei",
+        "location",
+        "new_payee",
+        "amount_100k",
+        "new_device_login"
+      ],
+      "tools_in_order": [
+        "create_case",
+        "verify_handoff",
+        "verify_handoff",
+        "get_recent_transactions",
+        "get_sim_swap_status",
+        "get_customer_profile",
+        "get_device_change",
+        "get_location_events",
+        "get_payee_history",
+        "get_port_out_status",
+        "get_credential_events",
+        "get_sim_history",
+        "verify_handoff",
+        "verify_handoff",
+        "compute_risk_score",
+        "verify_handoff",
+        "compute_risk_score",
+        "hold_transaction",
+        "verify_handoff",
+        "send_email",
+        "send_sms",
+        "send_push",
+        "send_email",
+        "send_sms"
+      ],
+      "handoffs": [
+        "supervisor->telecom",
+        "supervisor->banking",
+        "banking->risk",
+        "telecom->risk",
+        "risk->policy",
+        "policy->alert",
+        "alert->customer",
+        "alert->customer"
+      ],
+      "notifications": [
+        {
+          "channel": "push",
+          "title": "Confirm a payment",
+          "delivery": "inbox_stored"
+        }
+      ],
+      "alert_attempts": [
+        {
+          "tool": "send_push",
+          "state": "calling_tool",
+          "result": {
+            "channel": "push",
+            "in_app": "stored",
+            "notification_id": "ntf_c638a695a7",
+            "fcm": "skipped",
+            "devices": 0,
+            "delivery": {
+              "state": "inbox_stored",
+              "channel": "push",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Stored in the PayShield inbox. No push provider is in use."
+            },
+            "latency_ms": 2
+          }
+        },
+        {
+          "tool": "send_email",
+          "state": "calling_tool",
+          "result": {
+            "channel": "email",
+            "status": "failed",
+            "driver": "smtp",
+            "detail": "mail server unreachable",
+            "delivery": {
+              "state": "failed",
+              "channel": "email",
+              "confirmed": false,
+              "inbox_stored": false,
+              "provider": "smtp",
+              "provider_message_id": null,
+              "reason": "unreachable",
+              "retryable": true,
+              "note": "A drill switched the mail server off."
+            },
+            "latency_ms": 0,
+            "retried": true,
+            "attempts": 2
+          }
+        },
+        {
+          "tool": "send_sms",
+          "state": "calling_tool",
+          "result": {
+            "channel": "sms",
+            "status": "failed",
+            "driver": "gateway",
+            "detail": "gateway unreachable",
+            "delivery": {
+              "state": "failed",
+              "channel": "sms",
+              "confirmed": false,
+              "inbox_stored": false,
+              "provider": "textlk",
+              "provider_message_id": null,
+              "reason": "unreachable",
+              "retryable": true,
+              "note": "A drill switched the SMS gateway off."
+            },
+            "latency_ms": 0,
+            "retried": true,
+            "attempts": 2
+          }
+        }
+      ],
+      "events": 58
+    },
+    "notes": "SMS and email fail; the in-app inbox still reaches the customer",
+    "problems": []
+  },
+  {
+    "scenario": "district_spike",
+    "expectation": {
+      "case_status": "waiting_customer",
+      "payment_status": "held",
+      "debit": false
+    },
+    "rules": {
+      "rules_decision": "release",
+      "rules_score": 8
+    },
+    "observed": {
+      "case_status": "waiting_customer",
+      "payment_status": "held",
+      "amount_lkr": 75000,
+      "balance_change_lkr": 0,
+      "score": 8,
+      "decision": "hold",
+      "reason": "Emergency rule: Colombo is in emergency mode (demo: spike (set by matrix)). Payments of Rs. 75,000 or more are held until the customer confirms them on their registered device.",
+      "snapshot_digest": "32fb2bde096d027b",
+      "factors": [
+        "amount_50k",
+        "Colombo is in emergency mode"
+      ],
+      "tools_in_order": [
+        "create_case",
+        "verify_handoff",
+        "verify_handoff",
+        "get_recent_transactions",
+        "get_sim_swap_status",
+        "get_customer_profile",
+        "get_device_change",
+        "get_location_events",
+        "get_port_out_status",
+        "verify_handoff",
+        "verify_handoff",
+        "compute_risk_score",
+        "verify_handoff",
+        "compute_risk_score",
+        "hold_transaction",
+        "verify_handoff",
+        "send_push",
+        "send_email",
+        "send_sms"
+      ],
+      "handoffs": [
+        "supervisor->telecom",
+        "supervisor->banking",
+        "banking->risk",
+        "telecom->risk",
+        "risk->policy",
+        "policy->alert",
+        "alert->customer",
+        "alert->customer"
+      ],
+      "notifications": [
+        {
+          "channel": "push",
+          "title": "Confirm a payment",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Confirm a payment in PayShield",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        }
+      ],
+      "alert_attempts": [
+        {
+          "tool": "send_push",
+          "state": "calling_tool",
+          "result": {
+            "channel": "push",
+            "in_app": "stored",
+            "notification_id": "ntf_7ffbfae042",
+            "fcm": "skipped",
+            "devices": 0,
+            "delivery": {
+              "state": "inbox_stored",
+              "channel": "push",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Stored in the PayShield inbox. No push provider is in use."
+            },
+            "latency_ms": 2
+          }
+        },
+        {
+          "tool": "send_email",
+          "state": "calling_tool",
+          "result": {
+            "channel": "email",
+            "status": "logged",
+            "driver": "log",
+            "to": "[email]",
+            "notification_id": "ntf_7c8405ffdc",
+            "attachments": [],
+            "delivery": {
+              "state": "logged_only",
+              "channel": "email",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No email was sent."
+            },
+            "latency_ms": 2,
+            "attempts": 1
+          }
+        },
+        {
+          "tool": "send_sms",
+          "state": "calling_tool",
+          "result": {
+            "channel": "sms",
+            "status": "logged",
+            "driver": "log",
+            "to": "[phone ..83]",
+            "notification_id": "ntf_19cde36ff6",
+            "delivery": {
+              "state": "logged_only",
+              "channel": "sms",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No SMS was sent."
+            },
+            "latency_ms": 2,
+            "attempts": 1
+          }
+        }
+      ],
+      "events": 46
+    },
+    "notes": "the normal rules would release Rs. 75,000; emergency mode holds it",
+    "problems": []
+  },
+  {
+    "scenario": "agent_failure",
+    "expectation": {
+      "case_status": "escalated",
+      "payment_status": "held",
+      "debit": false
+    },
+    "rules": null,
+    "observed": {
+      "case_status": "escalated",
+      "payment_status": "held",
+      "amount_lkr": 4850,
+      "balance_change_lkr": 0,
+      "score": null,
+      "decision": null,
+      "reason": null,
+      "snapshot_digest": null,
+      "factors": [],
+      "tools_in_order": [
+        "create_case",
+        "verify_handoff",
+        "verify_handoff",
+        "get_recent_transactions",
+        "get_sim_swap_status",
+        "get_customer_profile",
+        "get_device_change",
+        "get_location_events",
+        "get_port_out_status"
+      ],
+      "handoffs": [
+        "supervisor->telecom",
+        "supervisor->banking",
+        "banking->risk",
+        "telecom->risk",
+        "supervisor->analyst"
+      ],
+      "notifications": [
+        {
+          "channel": "push",
+          "title": "Payment still on hold",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Payment still on hold",
+          "delivery": "logged_only"
+        }
+      ],
+      "alert_attempts": [],
+      "events": 26
+    },
+    "notes": "the risk agent crashes",
+    "problems": []
+  },
+  {
+    "scenario": "manual_freeze",
+    "expectation": {
+      "payment_status": "held",
+      "debit": false
+    },
+    "rules": {
+      "rules_decision": "release",
+      "rules_score": 0
+    },
+    "observed": {
+      "case_status": "waiting_customer",
+      "payment_status": "held",
+      "amount_lkr": 4850,
+      "balance_change_lkr": 0,
+      "score": 0,
+      "decision": "hold",
+      "reason": "Account limit: the fraud desk limited transfers on this account after an earlier case, so this payment is held until the customer confirms it and a person clears the limit.",
+      "snapshot_digest": "e58c21219f85084b",
+      "factors": [
+        "Transfers on this account are limited by the fraud desk"
+      ],
+      "tools_in_order": [
+        "create_case",
+        "verify_handoff",
+        "verify_handoff",
+        "get_recent_transactions",
+        "get_sim_swap_status",
+        "get_customer_profile",
+        "get_device_change",
+        "get_location_events",
+        "get_port_out_status",
+        "verify_handoff",
+        "verify_handoff",
+        "compute_risk_score",
+        "verify_handoff",
+        "compute_risk_score",
+        "hold_transaction",
+        "verify_handoff",
+        "send_push",
+        "send_email",
+        "send_sms"
+      ],
+      "handoffs": [
+        "supervisor->telecom",
+        "supervisor->banking",
+        "banking->risk",
+        "telecom->risk",
+        "risk->policy",
+        "policy->alert",
+        "alert->customer",
+        "alert->customer"
+      ],
+      "notifications": [
+        {
+          "channel": "push",
+          "title": "Confirm a payment",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Confirm a payment in PayShield",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        }
+      ],
+      "alert_attempts": [
+        {
+          "tool": "send_push",
+          "state": "calling_tool",
+          "result": {
+            "channel": "push",
+            "in_app": "stored",
+            "notification_id": "ntf_4f6549d6b3",
+            "fcm": "skipped",
+            "devices": 0,
+            "delivery": {
+              "state": "inbox_stored",
+              "channel": "push",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Stored in the PayShield inbox. No push provider is in use."
+            },
+            "latency_ms": 2
+          }
+        },
+        {
+          "tool": "send_email",
+          "state": "calling_tool",
+          "result": {
+            "channel": "email",
+            "status": "logged",
+            "driver": "log",
+            "to": "[email]",
+            "notification_id": "ntf_7870e3b3c8",
+            "attachments": [],
+            "delivery": {
+              "state": "logged_only",
+              "channel": "email",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No email was sent."
+            },
+            "latency_ms": 2,
+            "attempts": 1
+          }
+        },
+        {
+          "tool": "send_sms",
+          "state": "calling_tool",
+          "result": {
+            "channel": "sms",
+            "status": "logged",
+            "driver": "log",
+            "to": "[phone ..83]",
+            "notification_id": "ntf_472d94ae84",
+            "delivery": {
+              "state": "logged_only",
+              "channel": "sms",
+              "confirmed": false,
+              "inbox_stored": true,
+              "provider": null,
+              "provider_message_id": null,
+              "reason": null,
+              "retryable": false,
+              "note": "Written to the server log and kept in the inbox. No SMS was sent."
+            },
+            "latency_ms": 2,
+            "attempts": 1
+          }
+        }
+      ],
+      "events": 46
+    },
+    "notes": "an analyst limited transfers on the account first",
+    "problems": []
+  },
+  {
+    "scenario": "large_payment (no emergency)",
+    "expectation": {
+      "payment_status": "released",
+      "debit": true
+    },
+    "rules": {
+      "rules_decision": "release",
+      "rules_score": 8
+    },
+    "observed": {
+      "case_status": "closed_cleared",
+      "payment_status": "released",
+      "amount_lkr": 75000,
+      "balance_change_lkr": -75000,
+      "score": 8,
+      "decision": "release",
+      "reason": "Rule: the signals do not meet the hold threshold. The transfer can proceed. A short case note is still filed.",
+      "snapshot_digest": "32fb2bde096d027b",
+      "factors": [
+        "amount_50k"
+      ],
+      "tools_in_order": [
+        "create_case",
+        "verify_handoff",
+        "verify_handoff",
+        "get_recent_transactions",
+        "get_sim_swap_status",
+        "get_customer_profile",
+        "get_device_change",
+        "get_location_events",
+        "get_port_out_status",
+        "verify_handoff",
+        "verify_handoff",
+        "compute_risk_score",
+        "verify_handoff",
+        "compute_risk_score",
+        "verify_handoff",
+        "revalidate_before_release",
+        "release_transaction",
+        "verify_handoff",
+        "review_notes",
+        "generate_report",
+        "deliver_report"
+      ],
+      "handoffs": [
+        "supervisor->telecom",
+        "supervisor->banking",
+        "banking->risk",
+        "telecom->risk",
+        "risk->policy",
+        "policy->release"
+      ],
+      "notifications": [
+        {
+          "channel": "push",
+          "title": "Payment update",
+          "delivery": "inbox_stored"
+        },
+        {
+          "channel": "email",
+          "title": "Payment update",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "email",
+          "title": "Your PayShield receipt PS-26-00046",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "sms",
+          "title": "SMS",
+          "delivery": "logged_only"
+        },
+        {
+          "channel": "push",
+          "title": "Your receipt is ready",
+          "delivery": "inbox_stored"
+        }
+      ],
+      "alert_attempts": [],
+      "events": 49
+    },
+    "notes": "no emergency: the normal rules release",
+    "problems": []
+  }
+]
