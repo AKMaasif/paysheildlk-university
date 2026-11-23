@@ -2,6 +2,8 @@ import hashlib
 import hmac
 import os
 import re
+import threading
+import time
 
 import jwt
 import pyotp
@@ -58,6 +60,7 @@ def password_needs_upgrade(stored: str) -> bool:
         return True
 
 
+# Legacy (version 0) answer hashing. Nothing writes these any more; app.answers reads old rows and replaces them.
 def normalise_answer(answer: str) -> str:
     return re.sub(r"[^a-z0-9]", "", (answer or "").lower())
 
@@ -97,7 +100,7 @@ def seal_totp(secret: str) -> str:
     from app.crypto import encrypt
     from app.runtime import runtime
 
-    return encrypt(secret, runtime.settings.encryption_key)
+    return encrypt(secret, runtime.settings.encryption_key, "totp")
 
 
 def open_totp(stored: str | None) -> str:
@@ -105,7 +108,7 @@ def open_totp(stored: str | None) -> str:
     from app.crypto import decrypt
     from app.runtime import runtime
 
-    return decrypt(stored or "", runtime.settings.encryption_key)
+    return decrypt(stored or "", runtime.settings.encryption_key, "totp")
 
 
 def totp_now(secret: str) -> str:
@@ -117,6 +120,26 @@ def totp_valid(secret: str, code: str) -> bool:
     if not re.fullmatch(r"\d{6}", cleaned):
         return False
     return pyotp.TOTP(secret).verify(cleaned, valid_window=1)
+
+
+_used_codes: dict[tuple[str, str], float] = {}
+_used_lock = threading.Lock()
+
+
+def totp_accept(user_id: str, secret: str, code: str) -> bool:
+    """A code that is valid now and has not been used by this account in the last 90 seconds. A code seen over a
+    shoulder or in a replayed request cannot be used a second time. Held in memory, so a restart forgets it."""
+    if not totp_valid(secret, code):
+        return False
+    cleaned = re.sub(r"\s", "", code)
+    now = time.monotonic()
+    with _used_lock:
+        for key in [k for k, at in _used_codes.items() if now - at > 90]:
+            del _used_codes[key]
+        if (user_id, cleaned) in _used_codes:
+            return False
+        _used_codes[(user_id, cleaned)] = now
+    return True
 
 
 def totp_uri(secret: str, email: str) -> str:
