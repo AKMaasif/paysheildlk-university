@@ -75,8 +75,8 @@ def test_an_empty_database_is_created_and_marked_current(tmp_path):
 def test_a_database_at_an_older_revision_is_upgraded_and_keeps_its_data(tmp_path):
     scripts = tmp_path / "scripts"
     shutil.copytree(migrate.HERE, scripts, ignore=shutil.ignore_patterns("__pycache__"))
-    (scripts / "versions" / "0003_add_nickname.py").write_text(
-        '"""add a nickname"""\nimport sqlalchemy as sa\nfrom alembic import op\n\nrevision = "0003"\ndown_revision = "0002"\nbranch_labels = None\ndepends_on = None\n\n\n'
+    (scripts / "versions" / "0004_add_nickname.py").write_text(
+        '"""add a nickname"""\nimport sqlalchemy as sa\nfrom alembic import op\n\nrevision = "0004"\ndown_revision = "0003"\nbranch_labels = None\ndepends_on = None\n\n\n'
         'def upgrade() -> None:\n    op.add_column("users", sa.Column("nickname", sa.String(40), nullable=True))\n\n\n'
         'def downgrade() -> None:\n    op.drop_column("users", "nickname")\n'
     )
@@ -86,9 +86,13 @@ def test_a_database_at_an_older_revision_is_upgraded_and_keeps_its_data(tmp_path
     add_user(engine)
     assert migrate.upgrade(engine, scripts=scripts) == "upgraded"
     assert "nickname" in {c["name"] for c in inspect(engine).get_columns("users")}
-    assert migrate.current_revision(engine) == "0003"
+    assert migrate.current_revision(engine) == "0004"
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT email, nickname FROM users WHERE id='u1'")).one() == ("a@b.lk", None)
+        email, nickname = connection.execute(text("SELECT email, nickname FROM users WHERE id='u1'")).one()
+    from app.config import Settings
+    from app.crypto import open_field
+
+    assert open_field(email, Settings.from_env().encryption_key, "email") == "a@b.lk" and nickname is None
     assert migrate.upgrade(engine, scripts=scripts) == "current"
 
 
@@ -122,7 +126,13 @@ def test_a_database_from_before_migrations_gets_its_newer_columns_and_keeps_its_
     assert {"username", "nic", "balance_lkr", "face_ref", "must_change_password"} <= have
     assert migrate.current_revision(engine) == migrate.head_revision()
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT email, full_name, balance_lkr, registered FROM users WHERE id='u1'")).one() == ("old@b.lk", "Old Customer", 0, 0)
+        email, *rest = connection.execute(text("SELECT email, full_name, balance_lkr, registered FROM users WHERE id='u1'")).one()
+    # The 0003 migration encrypted the personal field; the value is unchanged once opened with the key.
+    from app.config import Settings
+    from app.crypto import open_field
+
+    assert email.startswith("siv1$") and "old@b.lk" not in email
+    assert open_field(email, Settings.from_env().encryption_key, "email") == "old@b.lk" and rest == ["Old Customer", 0, 0]
     assert migrate.upgrade(engine, legacy_columns=_add_legacy_columns) == "current"
 
 
@@ -150,9 +160,9 @@ def test_the_new_migration_command_writes_a_script_when_a_model_has_changed(tmp_
         path = migrate.new_revision("add nickname", scripts)
     finally:
         users._columns.remove(users.c.nickname)
-    assert path is not None and path.name.startswith("0003_add_nickname")
+    assert path is not None and path.name.startswith("0004_add_nickname")
     text_ = path.read_text()
-    assert "nickname" in text_ and 'down_revision = "0002"' in text_.replace("'", '"')
+    assert "nickname" in text_ and 'down_revision = "0003"' in text_.replace("'", '"')
 
 
 def test_the_head_command_prints_the_newest_revision(capsys, monkeypatch):
