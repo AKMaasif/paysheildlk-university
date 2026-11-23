@@ -76,14 +76,15 @@ def test_registration_guesses_are_throttled(boot):
 
 
 def test_customer_sign_in_gets_short_access_and_refresh(boot):
-    from helpers import PASSWORD, record, register
+    from helpers import PASSWORD, authenticate, register, username_for
 
     with TestClient(app) as client:
         assert register(client).status_code == 200
-        done = client.post(
+        first = client.post(
             "/api/auth/login",
-            json={"email": record("cus_nimal")["name"], "password": PASSWORD, "portal": "customer"},
+            json={"email": username_for("cus_nimal"), "password": PASSWORD, "portal": "customer"},
         ).json()
+        done = authenticate(client, first)
         # A refresh token is not an access token.
         refused = client.get("/api/customer/home", headers={"Authorization": "Bearer " + done["refresh_token"]})
         assert refused.status_code in {401, 403}
@@ -99,7 +100,7 @@ def test_customer_sign_in_gets_short_access_and_refresh(boot):
 def test_authenticator_secrets_are_stored_encrypted(boot):
     with session_scope() as session:
         stored = session.get(User, "cus_nimal").totp_secret
-    assert stored.startswith("gcm$")
+    assert stored.startswith("gcm2$")
     assert open_totp(stored) == "57DNTC7YHTX72K5OESQCRL6OXOJBXNKX"
 
 
