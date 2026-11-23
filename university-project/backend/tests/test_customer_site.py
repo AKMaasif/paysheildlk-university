@@ -1,6 +1,16 @@
 """Registration, username sign-in, account summary and password change for the customer site."""
 from fastapi.testclient import TestClient
-from helpers import PASSWORD, frames, record, register, sign_in
+from helpers import (
+    PASSWORD,
+    authenticate,
+    correct_answers,
+    frames,
+    live_selfie,
+    record,
+    register,
+    sign_in,
+    username_for,
+)
 
 from app.agents.runner import begin_case, resume_case
 from app.db import session_scope
@@ -21,12 +31,13 @@ def test_register_claims_the_bank_record_and_stores_everything(boot):
     with TestClient(app) as client:
         reply = register(client)
         assert reply.status_code == 200, reply.text
-        assert reply.json()["token"] and reply.json()["user"]["bank"] == "BankCylone"
+        assert "token" not in reply.json() and reply.json()["step"] == "enrol" and reply.json()["pending_token"]
+        assert reply.json()["user"]["bank"] == "BankCylone"
     row = _user()
     assert row.registered and row.registered_at is not None
-    assert row.username == "nimal perera"
+    assert row.username == "nimal.perera"  # the one the test chose at registration
     assert verify_password(PASSWORD, row.password_hash) and PASSWORD not in row.password_hash
-    assert row.face_ref.startswith("gcm$") and len(row.face_hash) == 64
+    assert row.face_ref.startswith("gcm2$") and len(row.face_hash) == 64
     with session_scope() as session:
         sent = [n.channel for n in session.query(Notification).filter(Notification.user_id == "cus_nimal").all()]
     assert "email" in sent and "sms" in sent
@@ -85,17 +96,16 @@ def test_password_and_face_scan_rules(boot):
 
 
 def test_sign_in_needs_registration_then_only_username_and_password(boot):
-    row = record("cus_nimal")
     with TestClient(app) as client:
-        before = client.post("/api/auth/login", json={"email": row["name"], "password": PASSWORD, "portal": "customer"})
+        before = client.post("/api/auth/login", json={"email": username_for("cus_nimal"), "password": PASSWORD, "portal": "customer"})
         assert before.status_code == 401
         assert register(client).status_code == 200
-        ok = client.post("/api/auth/login", json={"email": "Nimal  Perera", "password": PASSWORD, "portal": "customer"})
-        assert ok.status_code == 200 and "pending_token" not in ok.json()
-        bad = client.post("/api/auth/login", json={"email": row["name"], "password": "Wrong-1234", "portal": "customer"})
+        ok = client.post("/api/auth/login", json={"email": " Nimal.Perera ", "password": PASSWORD, "portal": "customer"})
+        assert ok.status_code == 200 and "token" not in ok.json() and ok.json()["pending_token"]  # the code step follows
+        bad = client.post("/api/auth/login", json={"email": username_for("cus_nimal"), "password": "Wrong-1234", "portal": "customer"})
         assert bad.status_code == 401
         # A customer cannot use the operator console, and an operator cannot use the customer site.
-        assert client.post("/api/auth/login", json={"email": row["email"], "password": PASSWORD, "portal": "operator"}).status_code == 403
+        assert client.post("/api/auth/login", json={"email": record("cus_nimal")["email"], "password": PASSWORD, "portal": "operator"}).status_code == 403
         assert client.post("/api/auth/login", json={"email": "analyst@payshield.lk", "password": "pilot-analyst", "portal": "customer"}).status_code == 401
 
 
@@ -131,9 +141,8 @@ def test_change_password_updates_database_and_sends_email_and_sms(boot):
         done = client.post("/api/customer/password", json=body, headers=headers)
         assert done.status_code == 200 and done.json()["email"] == "logged" and done.json()["sms"] == "logged"
         # The old password stops working and the new one works.
-        row = record("cus_nimal")
-        assert client.post("/api/auth/login", json={"email": row["name"], "password": PASSWORD, "portal": "customer"}).status_code == 401
-        assert client.post("/api/auth/login", json={"email": row["name"], "password": "Lagoon-86420", "portal": "customer"}).status_code == 200
+        assert client.post("/api/auth/login", json={"email": username_for("cus_nimal"), "password": PASSWORD, "portal": "customer"}).status_code == 401
+        assert client.post("/api/auth/login", json={"email": username_for("cus_nimal"), "password": "Lagoon-86420", "portal": "customer"}).status_code == 200
     stored = _user()
     assert verify_password("Lagoon-86420", stored.password_hash) and stored.password_changed_at is not None
     with session_scope() as session:
@@ -182,8 +191,8 @@ def test_yes_path_still_releases_and_the_balance_is_debited_once(boot):
     case_id = trigger("cus_nimal", "sim_swap_transfer")
     begin_case(case_id)
     assert resume_case(case_id, {"decision": "yes"}, "waiting_customer")
-    assert resume_case(case_id, {"liveness": "pass"}, "waiting_liveness")
-    assert resume_case(case_id, {"answers": {"school": "Royal College", "city": "Galle"}}, "waiting_verification")
+    assert resume_case(case_id, live_selfie(), "waiting_liveness")
+    assert resume_case(case_id, {"answers": correct_answers(case_id)}, "waiting_verification")
     with session_scope() as session:
         assert session.get(Case, case_id).status == "closed_released"
     assert _user().balance_lkr == start - 200_000
@@ -249,5 +258,5 @@ def test_console_adds_a_bank_record_that_the_customer_then_claims(boot):
             },
         )
         assert joined.status_code == 200, joined.text
-        info = client.get("/api/customer/account", headers={"Authorization": "Bearer " + joined.json()["token"]}).json()
+        info = client.get("/api/customer/account", headers={"Authorization": "Bearer " + authenticate(client, joined.json())["token"]}).json()
     assert info["bank"] == "BankCylone" and info["balance_lkr"] == 85_000 and info["branch"] == "Galle Fort"
