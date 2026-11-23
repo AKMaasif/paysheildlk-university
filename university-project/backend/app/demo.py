@@ -1,4 +1,5 @@
 from datetime import timedelta
+from functools import lru_cache
 
 from app.db import session_scope
 from app.models import (
@@ -10,6 +11,7 @@ from app.models import (
     Transaction,
     User,
 )
+from app.security import open_totp, totp_uri
 from app.seed import PILOT_ANSWERS
 from app.util import nid, utcnow
 
@@ -142,6 +144,18 @@ def reset_demo() -> dict:
         return {"cases_removed": len(case_ids), "accounts_cleared": cleared, "faults_cleared": faults.clear_all()}
 
 
+@lru_cache(maxsize=64)
+def _qr(uri: str) -> str:
+    import base64
+    import io
+
+    import qrcode
+
+    buffer = io.BytesIO()
+    qrcode.make(uri).save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode()
+
+
 def assist(customer_id: str) -> dict:
     """What a presenter types into the registration form, and the answers to the security questions."""
     from app.runtime import runtime
@@ -163,6 +177,18 @@ def assist(customer_id: str) -> dict:
             "registered": bool(user.registered),
             "username": user.username,
         }
+        secret = open_totp(user.totp_secret) if user.totp_secret else None
+        record["authenticator"] = (
+            {
+                "secret": secret,
+                "otpauth_uri": totp_uri(secret, user.email),
+                "qr_png_base64": _qr(totp_uri(secret, user.email)),
+                "confirmed": bool(user.totp_enrolled),
+                "how": "Add this once to an authenticator app (scan the QR code or type the secret). After the password, the customer site asks for the 6-digit code from the app.",
+            }
+            if secret
+            else None
+        )
     return {
         **record,
         "answers": PILOT_ANSWERS.get(customer_id, {}),
@@ -188,6 +214,7 @@ def unregister(customer_id: str) -> bool:
         user.must_change_password = False
         user.password_changed_at = None
         user.password_hash = hash_password(secrets.token_urlsafe(24))
+        user.totp_enrolled = False  # the preset secret is kept; registering confirms it again with a first code
         return True
 
 
