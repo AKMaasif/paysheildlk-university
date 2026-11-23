@@ -157,14 +157,14 @@ def test_the_case_detail_shape_is_what_the_case_page_reads(client):
     assert data["events"] and {"agent", "state", "created_at", "message"} <= set(data["events"][0])
     # Operators never see the customer's stored face or security answers.
     blob = str(data)
-    for secret in ("face_ref", "face_hash", "password_hash", "gcm$", "pbkdf2$", "totp_secret"):
+    for secret in ("face_ref", "face_hash", "password_hash", "gcm$", "gcm2$", "siv1$", "pbkdf2$", "totp_secret"):
         assert secret not in blob
 
 
 def test_the_customer_views_never_carry_secrets_or_scores(client):
     for path in ("/api/customer/home", "/api/customer/account"):
         blob = client.get(path, headers=_headers("customer")).text
-        for secret in ("face_ref", "face_hash", "password_hash", "gcm$", "pbkdf2$", "totp_secret", "risk_score", "risk_factors", "policy_decision"):
+        for secret in ("face_ref", "face_hash", "password_hash", "gcm$", "gcm2$", "siv1$", "pbkdf2$", "totp_secret", "risk_score", "risk_factors", "policy_decision"):
             assert secret not in blob, (path, secret)
 
 
