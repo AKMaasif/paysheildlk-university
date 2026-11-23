@@ -1,5 +1,6 @@
 """Step-up checks must be decided on the server, never by what the client claims."""
 from fastapi.testclient import TestClient
+from helpers import live_selfie
 
 from app.agents.runner import begin_case, resume_case
 from app.db import session_scope
@@ -58,10 +59,12 @@ def test_another_customer_cannot_answer_the_selfie(boot):
 
 def test_answering_only_one_question_does_not_pass_the_round(boot):
     case_id = _held_at_selfie()
-    assert resume_case(case_id, {"liveness": "pass"}, "waiting_liveness")
+    assert resume_case(case_id, live_selfie(), "waiting_liveness")
     status, prompt, round_no = _status(case_id)
     assert status == "waiting_verification" and round_no == 1
-    known = {"school": "Royal College", "city": "Galle"}
+    from app.seed import PILOT_ANSWERS
+
+    known = PILOT_ANSWERS["cus_nimal"]
     first = prompt["questions"][0]["id"]
     assert len(prompt["questions"]) >= 2
     assert resume_case(case_id, {"answers": {first: known[first]}}, "waiting_verification")
