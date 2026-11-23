@@ -83,27 +83,32 @@ def test_a_bank_supervisor_cannot_widen_their_scope():
 
 # ---------------------------------------------------------------- encryption
 
+KEY = "unit-test-key-0123456789-0123456789-abcd"
+OTHER = "another-key-0123456789-0123456789-wxyz"
+
+
 def test_encryption_round_trips_and_hides_the_text():
-    blob = encrypt("face reference", "key-material")
-    assert blob.startswith("gcm$") and "face reference" not in blob
-    assert decrypt(blob, "key-material") == "face reference"
+    blob = encrypt("face reference", KEY)
+    assert blob.startswith("gcm2$") and "face reference" not in blob
+    assert decrypt(blob, KEY) == "face reference"
 
 
 def test_encryption_never_repeats_and_depends_on_the_key():
-    assert encrypt("same", "k") != encrypt("same", "k")
+    assert encrypt("same", KEY) != encrypt("same", KEY)
     with pytest.raises(Exception):
-        decrypt(encrypt("secret", "right"), "wrong")
+        decrypt(encrypt("secret", KEY), OTHER)
 
 
 def test_a_tampered_blob_is_refused_and_edge_values_are_handled():
-    blob = encrypt("secret", "k")
+    blob = encrypt("secret", KEY)
     head, nonce, body = blob.split("$")
     flipped = f"{head}${nonce}${body[:-2]}{'00' if body[-2:] != '00' else '11'}"
     with pytest.raises(Exception):
-        decrypt(flipped, "k")
-    assert encrypt(None, "k") == "" and decrypt("", "k") == "" and decrypt("plain text", "k") == "plain text"
-    assert decrypt(encrypt("ünïcode 顔", "k"), "k") == "ünïcode 顔"
-    assert decrypt(encrypt("x", ""), "") == "x"
+        decrypt(flipped, KEY)
+    assert encrypt(None, KEY) == "" and decrypt("", KEY) == "" and decrypt("plain text", KEY) == "plain text"
+    assert decrypt(encrypt("ünïcode 顔", KEY), KEY) == "ünïcode 顔"
+    with pytest.raises(Exception, match="at least 32"):
+        encrypt("x", "")  # there is no built-in fallback key any more
 
 
 # ---------------------------------------------------------------- the model client
