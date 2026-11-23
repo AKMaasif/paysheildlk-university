@@ -164,10 +164,10 @@ def test_stored_face_data_that_is_missing_or_unreadable_loads_as_nothing(boot):
 def test_tampered_stored_face_data_is_treated_as_no_face_on_file(boot):
     from app.crypto import encrypt
 
-    good = encrypt('{"embeddings": [[0.1]], "images": []}', boot.settings.encryption_key)
+    good = encrypt('{"embeddings": [[0.1]], "images": []}', boot.settings.encryption_key, "face")
     assert face.load_templates(good) is not None
     nonce, token = good.split("$")[1:]
-    flipped = f"gcm${nonce}${token[:-2]}{'00' if token[-2:] != '00' else 'ff'}"
+    flipped = f"gcm2${nonce}${token[:-2]}{'00' if token[-2:] != '00' else 'ff'}"
     assert face.load_templates(flipped) is None
-    wrong_key = encrypt('{"embeddings": [[0.1]]}', "some other key")
+    wrong_key = encrypt('{"embeddings": [[0.1]]}', "some-other-key-0123456789-0123456789-xx", "face")
     assert face.load_templates(wrong_key) is None
