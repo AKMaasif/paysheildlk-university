@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthSide } from "@/components/AuthSide";
+import { AuthenticatorStep, type Session } from "@/components/AuthenticatorStep";
 import { api, setToken, setUser } from "@/lib/api";
 
 export default function CustomerLogin() {
@@ -13,23 +14,30 @@ export default function CustomerLogin() {
   const [show, setShow] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<{ step: "totp" | "enrol"; pending_token: string } | null>(null);
 
   async function signIn(event: React.FormEvent) {
     event.preventDefault();
     setError("");
     setBusy(true);
     try {
-      const body = await api<{ token: string; refresh_token?: string; user: unknown }>("/api/auth/login", {
+      const body = await api<{ step: "totp" | "enrol"; pending_token: string }>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email: username, password, portal: "customer" }),
       });
-      setToken("customer", body.token, body.refresh_token);
-      setUser("customer", body.user);
-      router.replace("/c/home");
+      // The password alone never opens a session. The next screen asks for the authenticator code.
+      setPending(body);
+      setBusy(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-in failed");
       setBusy(false);
     }
+  }
+
+  function finish(session: Session) {
+    setToken("customer", session.token, session.refresh_token);
+    setUser("customer", session.user);
+    router.replace("/c/home");
   }
 
   return (
@@ -42,12 +50,13 @@ export default function CustomerLogin() {
         </div>
         <div className="cs-auth-box">
           <h1>Log in</h1>
-          <p>Use the username you chose when you registered.</p>
-          <form className="cs-form" onSubmit={signIn}>
+          <p>{pending ? "One more step to keep your account safe." : "Use the username you chose when you registered."}</p>
+          {pending && <AuthenticatorStep mode={pending.step} pendingToken={pending.pending_token} onDone={finish} onBack={() => { setPending(null); setPassword(""); }} />}
+          {!pending && <form className="cs-form" onSubmit={signIn}>
             {error && <div className="cs-error" role="alert">{error}</div>}
             <div className="cs-field">
               <label htmlFor="username">Username</label>
-              <input id="username" className="cs-input" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" placeholder="Your full name, as you registered it" required />
+              <input id="username" className="cs-input" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" placeholder="The username you chose when you registered" required />
             </div>
             <div className="cs-field">
               <label htmlFor="password">Password</label>
@@ -57,7 +66,7 @@ export default function CustomerLogin() {
               </div>
             </div>
             <button className="cs-btn primary block" type="submit" disabled={busy}>{busy ? "Signing in" : "Log in"}</button>
-          </form>
+          </form>}
           <p className="cs-switch">First time? <Link href="/c/register">Register your account</Link></p>
         </div>
       </main>
