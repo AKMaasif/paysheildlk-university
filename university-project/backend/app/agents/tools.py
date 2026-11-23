@@ -462,9 +462,35 @@ def ask_security_questions(customer_id: str, answers: dict, liveness: bool, only
         wanted = {item["id"] if isinstance(item, dict) else item for item in only}
         questions = [item for item in questions if item["id"] in wanted]
     passed = grade_round(questions, answers or {}, pepper)
+    if passed:
+        _upgrade_answer_hashes(customer_id, questions, answers or {})
     # Do not say which answer failed.
     detail = "The round matched." if passed else "Let's try another set."
     return {"passed": passed, "asked": len(questions), "detail": detail, "liveness": bool(liveness)}
+
+
+def _upgrade_answer_hashes(customer_id: str, questions: list[dict], answers: dict) -> None:
+    """After a correct round, answers still stored in an older format are stored again in the current one. The plain answer
+    is in hand only now, so this is the one moment it can be done."""
+    from app.answers import hash_secret, is_current
+    from app.db import session_scope
+    from app.models import SecurityAnswer, User
+
+    stale = [item for item in questions if not is_current(item.get("hash") or "")]
+    if not stale:
+        return
+    with session_scope() as session:
+        user = session.get(User, customer_id)
+        embedded = dict(user.security or {}) if user else {}
+        for item in stale:
+            fresh = hash_secret(answers.get(item["id"], ""), item["id"])
+            row = session.query(SecurityAnswer).filter(SecurityAnswer.user_id == customer_id, SecurityAnswer.code == item["id"]).first()
+            if row is not None:
+                row.answer_hash = fresh
+            elif isinstance(embedded.get(item["id"]), dict):
+                embedded[item["id"]] = {**embedded[item["id"]], "answer_hash": fresh}
+        if user is not None and embedded != dict(user.security or {}):
+            user.security = embedded
 
 
 def customer_questions(customer_id: str) -> list[dict]:
