@@ -176,12 +176,19 @@ def init_runtime() -> None:
 
     settings = Settings.from_env()
     settings.assert_safe_for_environment()
+    from app.crypto import check_key
+
+    check_key(settings.encryption_key)  # a missing or short key stops the service here, not on a later request
     if settings.database_url.startswith("sqlite"):
         raw = settings.database_url.split("///", 1)[-1]
         if raw and raw != ":memory:":
             Path(raw).parent.mkdir(parents=True, exist_ok=True)
     engine = configure_engine(settings.database_url)
     migrate.upgrade(engine, legacy_columns=_add_legacy_columns)
+    from app import fieldcrypt
+
+    fieldcrypt.check_key_matches_data(engine, settings.encryption_key)
+    fieldcrypt.encrypt_plain_fields(engine, settings.encryption_key)
     runtime.settings = settings
     runtime.engine = engine
     runtime.bus = EventBus()
