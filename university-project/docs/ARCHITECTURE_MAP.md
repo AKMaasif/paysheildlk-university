@@ -31,6 +31,18 @@ This describes what the code does today. Where it says "new", the behaviour was 
 
 Every hop between agents is a signed handoff (HMAC), checked against a route table and a replay guard. A tampered, expired, wrong-route or replayed handoff is refused and the case goes to the fail-safe, which holds the money.
 
+## Where the code is
+
+| Area | Files |
+| --- | --- |
+| Case graph wiring | `app/agents/graph.py` |
+| One agent step each | `app/agents/nodes/*.py` |
+| Shared by the steps (state, signed handoffs, tool wrapper, note writer) | `app/agents/base.py` |
+| Tools the steps may call, and the rules | `app/agents/tools.py`, `app/risk.py`, `app/charters.py` |
+| HTTP routes | `app/routes/*.py`, assembled by `app/api.py` |
+| Telecom events while a case is open | `app/ingest.py` |
+| Decision snapshots | `app/signals.py` |
+
 ## Who decides what
 
 | Question | Decided by | Model involvement |
