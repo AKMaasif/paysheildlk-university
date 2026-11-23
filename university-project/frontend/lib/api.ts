@@ -74,7 +74,7 @@ export class ApiError extends Error {
 }
 
 // These answer 401 for "the password you typed is wrong", not "your session ended".
-const credentialCheck = (path: string) => path.startsWith("/api/auth/") || path === "/api/customer/password";
+const credentialCheck = (path: string) => path.startsWith("/api/auth/") || path.startsWith("/api/customer/totp/") || path === "/api/customer/password";
 
 export async function api<T = unknown>(
   path: string,
