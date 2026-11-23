@@ -5,6 +5,7 @@ import time
 from datetime import timedelta
 
 import httpx
+from helpers import live_selfie
 
 from app import signals as contract
 from app.agents import tools
@@ -22,6 +23,7 @@ from app.models import (
 )
 from app.risk import Signals, compute_risk_score, decide_policy
 from app.runtime import runtime
+from app.seed import PILOT_ANSWERS
 from app.util import nid, utcnow
 
 REMOTE = "https://operator.example/camara"
@@ -376,10 +378,10 @@ def test_after_the_customer_passes_verification_new_high_risk_information_still_
     case_id = trigger("cus_nimal", "sim_swap_transfer")
     begin_case(case_id)
     resume_case(case_id, {"decision": "yes"}, "waiting_customer")
-    resume_case(case_id, {"liveness": "pass"}, "waiting_liveness")
+    resume_case(case_id, live_selfie(), "waiting_liveness")
     with session_scope() as session:
         prompts = session.get(Case, case_id).pending_prompt["questions"]
-    given = {item["id"]: {"school": "Royal College", "city": "Galle"}[item["id"]] for item in prompts}
+    given = {item["id"]: PILOT_ANSWERS["cus_nimal"][item["id"]] for item in prompts}
     intercept(monkeypatch, lambda: add_event(phone_of(), "port_out", 0.01))
     resume_case(case_id, {"answers": given}, "waiting_verification")
     after = state(case_id)
@@ -394,10 +396,10 @@ def test_the_same_verification_with_nothing_new_still_releases_once(boot):
         start = session.get(User, customer).balance_lkr
         amount = session.get(Transaction, tx).amount_lkr
     resume_case(case_id, {"decision": "yes"}, "waiting_customer")
-    resume_case(case_id, {"liveness": "pass"}, "waiting_liveness")
+    resume_case(case_id, live_selfie(), "waiting_liveness")
     with session_scope() as session:
         prompts = session.get(Case, case_id).pending_prompt["questions"]
-    given = {item["id"]: {"school": "Royal College", "city": "Galle"}[item["id"]] for item in prompts}
+    given = {item["id"]: PILOT_ANSWERS["cus_nimal"][item["id"]] for item in prompts}
     resume_case(case_id, {"answers": given}, "waiting_verification")
     after = state(case_id)
     assert (after["case"], after["tx"], after["balance"]) == ("closed_released", "released", start - amount)
@@ -412,9 +414,9 @@ def test_a_limited_account_that_the_customer_confirms_still_waits_for_a_person(b
     second = trigger("cus_nimal", "sim_swap_transfer")
     begin_case(second)
     resume_case(second, {"decision": "yes"}, "waiting_customer")
-    resume_case(second, {"liveness": "pass"}, "waiting_liveness")
+    resume_case(second, live_selfie(), "waiting_liveness")
     with session_scope() as session:
         prompts = session.get(Case, second).pending_prompt["questions"]
-    given = {item["id"]: {"school": "Royal College", "city": "Galle"}[item["id"]] for item in prompts}
+    given = {item["id"]: PILOT_ANSWERS["cus_nimal"][item["id"]] for item in prompts}
     resume_case(second, {"answers": given}, "waiting_verification")
     assert state(second)["case"] == "escalated" and state(second)["tx"] == "held"
