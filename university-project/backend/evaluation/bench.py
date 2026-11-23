@@ -304,9 +304,9 @@ def verification() -> list[dict]:
     ]
     grade_ok = sum(grade_round(qs, a, "pepper") == exp for a, exp in cases)
 
-    wrong_a = tools.ask_security_questions("cus_nimal", {"school": "x", "city": "Galle"}, True)["detail"]
-    wrong_b = tools.ask_security_questions("cus_nimal", {"school": "Royal College", "city": "x"}, True)["detail"]
-    wrong_ab = tools.ask_security_questions("cus_nimal", {"school": "x", "city": "y"}, True)["detail"]
+    wrong_a = tools.ask_security_questions("cus_nimal", {"school": "x", "city": "Galle"}, True, only=["school", "city"])["detail"]
+    wrong_b = tools.ask_security_questions("cus_nimal", {"school": "Royal College", "city": "x"}, True, only=["school", "city"])["detail"]
+    wrong_ab = tools.ask_security_questions("cus_nimal", {"school": "x", "city": "y"}, True, only=["school", "city"])["detail"]
     same_msg = int(wrong_a == wrong_b == wrong_ab)
     return [
         _check("real-looking frames pass the live check", live_ok, 30, "random frames; this is a demonstration check, not face recognition"),
