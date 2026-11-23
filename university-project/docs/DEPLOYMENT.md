@@ -151,5 +151,5 @@ that allows the site's own scripts and the OpenStreetMap tile server the Map pag
 ## 10. What a deployment still lacks
 
 * More than one backend process (section 3).
-* A rotation tool for `ENCRYPTION_KEY`. Rotating it today makes stored face templates and authenticator secrets unreadable.
+* A rotation tool for `ENCRYPTION_KEY`. Rotating it today makes stored face templates, authenticator secrets and the encrypted personal fields (email, phone, NIC, account number) unreadable; the service refuses to start on a key that does not match the stored data.
 * Real SIM-swap data, a real bank ledger, and a legal review of the face-data handling. See `docs/TEST_REPORT.md`, section 6.
