@@ -44,7 +44,7 @@ Dashboard times are Asia/Colombo. "Pause" on the live view only stops following;
 
 ## Demo script (about 12 minutes)
 
-Preparation: sign in as `analyst@payshield.lk`; open **Live Agent Activity** on the projector; open the customer site (`/c`) on a phone for the registered customer.
+Preparation: add the demo customer's authenticator to a phone app once (Demo control shows a QR code and key; it is a preset secret and stays the same, even after "Return to first-time state"). Sign in as `analyst@payshield.lk`; open **Live Agent Activity** on the projector; open the customer site (`/c`) on a phone for the registered customer.
 
 1. **Routine release.** Trigger "Routine bill of Rs. 4,850". Rules score it low and release it. Show the tool calls, the single debit, and the report.
 2. **Suspicious payment rejected.** Trigger "SIM swap and Rs. 200,000". It is held, not debited. On the phone answer **No**. Payment blocked, a simulated freeze request recorded, the account limited.
