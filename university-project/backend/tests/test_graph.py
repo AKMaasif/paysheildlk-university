@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+from helpers import live_selfie
+
 from app.agents.runner import begin_case, process_timeouts, resume_case
 from app.db import session_scope
 from app.demo import trigger
@@ -54,11 +56,13 @@ def test_customer_says_yes_and_passes_verification(boot):
     case, tx, _user, _report = _case(case_id)
     assert case.status == "waiting_liveness"
     assert tx.status == "held"
-    assert resume_case(case_id, {"liveness": "pass"}, "waiting_liveness")
+    assert resume_case(case_id, live_selfie(), "waiting_liveness")
     case, tx, _user, _report = _case(case_id)
     assert case.status == "waiting_verification"
     prompts = case.pending_prompt["questions"]
-    answers = {"school": "Royal College", "city": "Galle"}
+    from app.seed import PILOT_ANSWERS
+
+    answers = PILOT_ANSWERS["cus_nimal"]
     given = {item["id"]: answers[item["id"]] for item in prompts}
 
     assert resume_case(case_id, {"answers": given}, "waiting_verification")
@@ -75,7 +79,7 @@ def test_wrong_security_answers_block_the_payment(boot):
     case_id = trigger("cus_nimal", "sim_swap_transfer")
     begin_case(case_id)
     assert resume_case(case_id, {"decision": "yes"}, "waiting_customer")
-    assert resume_case(case_id, {"liveness": "pass"}, "waiting_liveness")
+    assert resume_case(case_id, live_selfie(), "waiting_liveness")
     for _ in range(4):
         case, _tx, _user, _report = _case(case_id)
         assert case.status == "waiting_verification"
