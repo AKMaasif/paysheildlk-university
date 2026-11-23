@@ -14,7 +14,22 @@ from pathlib import Path
 from evaluation import harness
 
 ROOT = Path(__file__).resolve().parents[2] / "docs"
-ANSWERS = {"school": "Royal College", "city": "Galle"}
+from app.seed import PILOT_ANSWERS  # noqa: E402
+
+ANSWERS = PILOT_ANSWERS["cus_nimal"]
+
+
+def live_selfie() -> dict:
+    import os
+
+    return {"frames": [os.urandom(1500), os.urandom(1500)]}
+
+
+def fake_selfie() -> dict:
+    import os
+
+    still = os.urandom(1500)
+    return {"frames": [still, still]}
 
 
 def fresh():
@@ -120,7 +135,7 @@ def verify_path(case_id):
     from app.models import Case
 
     resume_case(case_id, {"decision": "yes"}, "waiting_customer")
-    resume_case(case_id, {"liveness": "pass"}, "waiting_liveness")
+    resume_case(case_id, live_selfie(), "waiting_liveness")
     with session_scope() as s:
         prompts = s.get(Case, case_id).pending_prompt["questions"]
     resume_case(
@@ -183,7 +198,7 @@ def run_all():
         c, b = start("cus_nimal", "sim_swap_transfer")
         begin_case(c)
         resume_case(c, {"decision": "yes"}, "waiting_customer")
-        resume_case(c, {"liveness": "fail"}, "waiting_liveness")
+        resume_case(c, fake_selfie(), "waiting_liveness")
         return c, b, "face scan failed"
 
     record(
