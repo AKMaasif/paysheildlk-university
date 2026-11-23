@@ -2,27 +2,66 @@ from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.types import JSON
+from sqlalchemy.types import JSON, TypeDecorator
 
 from app.db import Base
 from app.util import utcnow
+
+
+class Sensitive(TypeDecorator):
+    """A personal field stored encrypted. Code reads and writes the plain value; the database holds siv1$ ciphertext.
+    The same value always gives the same ciphertext, so `User.email == "x"` and similar lookups keep working: the value
+    being compared is encrypted the same way before it reaches the query. Rows written before this existed are plain text
+    and still read, and are encrypted by the 0003 migration and by a check at every start."""
+
+    impl = String
+    cache_ok = True
+
+    def __init__(self, purpose: str, length: int = 255):
+        super().__init__(length)
+        self.purpose = purpose
+
+    def _secret(self) -> str:
+        from app.runtime import runtime
+
+        if runtime.settings is not None:
+            return runtime.settings.encryption_key
+        from app.config import (
+            Settings,  # used outside the running service, for example by a migration script
+        )
+
+        return Settings.from_env().encryption_key
+
+    def process_bind_param(self, value, dialect):
+        if value is None or str(value).startswith("siv1$"):
+            return value
+        from app.crypto import seal_field
+
+        return seal_field(str(value), self._secret(), self.purpose)
+
+    def process_result_value(self, value, dialect):
+        if value is None or not str(value).startswith("siv1$"):
+            return value
+        from app.crypto import open_field
+
+        return open_field(value, self._secret(), self.purpose)
 
 
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    email: Mapped[str] = mapped_column(Sensitive("email", 700), unique=True, index=True)
     username: Mapped[str | None] = mapped_column(String(80), unique=True, nullable=True)
     full_name: Mapped[str] = mapped_column(String(200))
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(40), index=True)
-    phone: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    phone: Mapped[str | None] = mapped_column(Sensitive("phone", 160), nullable=True, index=True)
     bank: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
     province: Mapped[str | None] = mapped_column(String(80), nullable=True)
     district: Mapped[str | None] = mapped_column(String(80), nullable=True)
     branch: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    account_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    account_number: Mapped[str | None] = mapped_column(Sensitive("account", 160), nullable=True)
     lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     lng: Mapped[float | None] = mapped_column(Float, nullable=True)
     totp_secret: Mapped[str | None] = mapped_column(String(400), nullable=True)
@@ -35,7 +74,7 @@ class User(Base):
     restricted_reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
     security: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # Customer record held by the bank, and what the customer set up when they registered in the app.
-    nic: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    nic: Mapped[str | None] = mapped_column(Sensitive("nic", 160), nullable=True)
     balance_lkr: Mapped[int] = mapped_column(Integer, default=0)
     registered: Mapped[bool] = mapped_column(Boolean, default=False)
     registered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
