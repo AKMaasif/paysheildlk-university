@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthSide } from "@/components/AuthSide";
 import { FaceCapture, type Capture, type Challenge } from "@/components/FaceCapture";
+import { AuthenticatorStep, type Session } from "@/components/AuthenticatorStep";
 import { api, setToken, setUser } from "@/lib/api";
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 const RULES: [string, (p: string) => boolean][] = [
   ["At least 8 characters", (p) => p.length >= 8],
@@ -25,6 +26,9 @@ export default function Register() {
   const [hints, setHints] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pendingToken, setPendingToken] = useState("");
+  const [username, setUsername] = useState("");
+  const [madeUsername, setMadeUsername] = useState("");
 
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: e.target.value });
 
@@ -69,17 +73,22 @@ export default function Register() {
     setHints([]);
     setBusy(true);
     try {
-      const body = await api<{ token: string; refresh_token?: string; user: unknown }>("/api/customer/register", {
+      const body = await api<{ pending_token: string; username: string; user: unknown }>("/api/customer/register", {
         method: "POST",
-        body: JSON.stringify({ ...form, password, confirm_password: confirm, frames: capture.frames, offsets_ms: capture.offsets_ms, challenge: capture.challenge }),
+        body: JSON.stringify({ ...form, username: username.trim() || null, password, confirm_password: confirm, frames: capture.frames, offsets_ms: capture.offsets_ms, challenge: capture.challenge }),
       });
-      setToken("customer", body.token, body.refresh_token);
-      setUser("customer", body.user);
-      router.replace("/c/home");
+      // The account exists, but no session yet: the customer adds it to an authenticator app and proves it with a code.
+      setPendingToken(body.pending_token);
+      setMadeUsername(body.username);
+      setBusy(false);
+      setStep(4);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Registration failed";
       setBusy(false);
-      if (message.includes("do not match")) {
+      if (/username/i.test(message)) {
+        setError(message);
+        setStep(2);
+      } else if (message.includes("do not match")) {
         setError(message);
         setStep(1);
       } else if (message.includes("face scan")) {
@@ -92,11 +101,17 @@ export default function Register() {
     }
   }
 
-  const steps = ["Your details", "Password", "Face scan"];
+  function finish(session: Session) {
+    setToken("customer", session.token, session.refresh_token);
+    setUser("customer", session.user);
+    router.replace("/c/home");
+  }
+
+  const steps = ["Your details", "Password", "Face scan", "Authenticator"];
 
   return (
     <div className="cs-auth">
-      <AuthSide title="Register in three short steps." text="BankCylone already holds your details. Registering proves you are the person on that record and lets you choose a password." />
+      <AuthSide title="Register in four short steps." text="BankCylone already holds your details. Registering proves you are the person on that record and lets you choose a password." />
       <main className="cs-auth-main">
         <div className="cs-auth-top">
           <Link href="/c">&larr; Back to home</Link>
@@ -129,6 +144,11 @@ export default function Register() {
           {step === 2 && (
             <form className="cs-form" onSubmit={toScan}>
               {error && <div className="cs-error" role="alert">{error}</div>}
+              <div className="cs-field">
+                <label htmlFor="u">Username (optional)</label>
+                <input id="u" className="cs-input" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" placeholder="Leave blank and we will make one for you" maxLength={30} />
+                <p className="fine">4 to 30 letters, digits, dots, dashes or underscores. You will use it to log in.</p>
+              </div>
               <div className="cs-field">
                 <label htmlFor="p">Password</label>
                 <div className="cs-pw">
@@ -171,6 +191,12 @@ export default function Register() {
                 <button className="cs-btn ghost" type="button" onClick={() => setStep(2)} disabled={busy}>Back</button>
               </div>
             </div>
+          )}
+          {step === 4 && pendingToken && madeUsername && (
+            <p className="cs-notice" role="status">Your username is <strong>{madeUsername}</strong>. Keep it safe: you need it to log in.</p>
+          )}
+          {step === 4 && pendingToken && (
+            <AuthenticatorStep mode="enrol" pendingToken={pendingToken} onDone={finish} onBack={() => router.replace("/c/login")} />
           )}
         </div>
       </main>
