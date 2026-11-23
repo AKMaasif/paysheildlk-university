@@ -12,17 +12,11 @@ def _entropy(blob: bytes) -> float:
     return -sum((count / total) * math.log2(count / total) for count in counts if count)
 
 
-def analyse(frames: list[bytes] | None = None, verdict: str | None = None) -> dict:
-    """Live-human check. Tests may pass an explicit verdict. Otherwise two frames are compared."""
+def analyse(frames: list[bytes] | None = None) -> dict:
+    """The simple live-human check used when the face engine is off: two different camera frames with enough detail.
+    There is no way to pass a verdict in. Only the frames decide."""
     frames = [frame for frame in (frames or []) if frame]
     digest = hashlib.sha256(b"|".join(frames)).hexdigest() if frames else ""
-    if verdict in {"pass", "fail"}:
-        return {
-            "verdict": "live" if verdict == "pass" else "fake",
-            "confidence": 0.99 if verdict == "pass" else 0.95,
-            "reasons": ["explicit check for the desk test"],
-            "image_sha256": digest,
-        }
     if len(frames) < 2:
         return {"verdict": "fake", "confidence": 0.7, "reasons": ["need two frames from the camera"], "image_sha256": digest}
     first, second = frames[0], frames[1]
