@@ -17,8 +17,20 @@ type Assist = {
   bank: string;
   registered: boolean;
   username: string | null;
-  answers: { school?: string; city?: string };
+  answers: Record<string, string>;
+  authenticator?: { secret: string; otpauth_uri: string; qr_png_base64: string; confirmed: boolean; how: string } | null;
   note: string;
+};
+
+const LABELS: Record<string, string> = {
+  colour: "Favourite colour",
+  food: "Favourite food",
+  father: "Father's first name",
+  dob: "Date of birth",
+  mother: "Mother's maiden name",
+  school: "First school",
+  city: "Town of birth",
+  pet: "First pet",
 };
 
 export default function DemoPage() {
@@ -130,8 +142,26 @@ export default function DemoPage() {
                   <tr><td>Status</td><td>{assist.registered ? `Registered. Username: ${assist.username}` : "Not registered yet"}</td></tr>
                 </tbody>
               </table>
-              <p>School: {assist.answers.school}. City of birth: {assist.answers.city}.</p>
+              <p className="fine" style={{ marginBottom: 4 }}>Security answers (each round asks three of these eight, in a random order):</p>
+              <table className="data" style={{ cursor: "default" }}>
+                <tbody>
+                  {Object.entries(assist.answers).map(([code, answer]) => (
+                    <tr key={code}><td>{LABELS[code] || code}</td><td>{answer}</td></tr>
+                  ))}
+                </tbody>
+              </table>
               <p className="fine">{assist.note}</p>
+              {assist.authenticator && (
+                <div style={{ display: "flex", gap: 16, alignItems: "center", margin: "12px 0" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`data:image/png;base64,${assist.authenticator.qr_png_base64}`} alt="Authenticator QR code for this customer" width={132} height={132} />
+                  <div>
+                    <strong>Authenticator (preset)</strong>
+                    <p className="fine" style={{ margin: "4px 0" }}>{assist.authenticator.how}</p>
+                    <p className="fine" style={{ margin: 0 }}>Key: <code>{assist.authenticator.secret}</code> · {assist.authenticator.confirmed ? "confirmed" : "confirmed at the customer's first code"}</p>
+                  </div>
+                </div>
+              )}
               {assist.registered && (
                 <button
                   className="btn"
