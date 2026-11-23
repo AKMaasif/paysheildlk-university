@@ -2,6 +2,7 @@ import re
 import secrets
 from datetime import timedelta
 
+from app.answers import QUESTION_BANK, hash_secret
 from app.models import (
     AccessRequest,
     AuditLog,
@@ -10,12 +11,13 @@ from app.models import (
     Device,
     Invitation,
     Report,
+    SecurityAnswer,
     SimEvent,
     Transaction,
     User,
 )
 from app.reports import render_report
-from app.security import hash_answer, hash_password, seal_totp
+from app.security import hash_password, seal_totp
 from app.util import nid, utcnow
 
 # Fictional people and answers for the pilot. Demo control shows them when DEMO_ASSIST is on.
@@ -206,12 +208,37 @@ OPERATORS = [
     ("usr_admin", "Sanduni de Silva", "admin@payshield.lk", "pilot-admin", "super_admin", None),
 ]
 
+# Fictional answers for the demonstration customers. Eight questions each, so every round of three can differ.
+_EXTRA = {
+    "cus_nimal": ("blue", "kottu", "Sunil", "1985-03-04", "Fernando", "Rex"),
+    "cus_kumari": ("green", "hoppers", "Ananda", "1990-07-21", "Silva", "Mimi"),
+    "cus_fathima": ("purple", "biriyani", "Rizwan", "1988-11-02", "Cader", "Luna"),
+    "cus_ravi": ("red", "pol roti", "Mahesh", "1979-01-15", "Perera", "Bruno"),
+    "cus_anjali": ("yellow", "dosai", "Selvam", "1992-05-30", "Pillai", "Kitty"),
+    "cus_irfan": ("black", "lamprais", "Faiz", "1983-09-09", "Hameed", "Simba"),
+    "cus_dilani": ("orange", "string hoppers", "Chandana", "1995-12-12", "Gunawardena", "Coco"),
+    "cus_suresh": ("white", "rice and curry", "Kumar", "1976-04-18", "Rajan", "Tiger"),
+    "cus_harshani": ("pink", "watalappan", "Nalin", "1987-08-25", "Weerasinghe", "Daisy"),
+    "cus_lasantha": ("grey", "kiribath", "Upali", "1981-02-02", "Jayasuriya", "Max"),
+}
+_CODES = ("colour", "food", "father", "dob", "mother", "pet")
+
 PILOT_ANSWERS = {
-    row["id"]: {"school": row["school"], "city": row["city"]} for row in CUSTOMERS
+    row["id"]: {"school": row["school"], "city": row["city"], **dict(zip(_CODES, _EXTRA[row["id"]], strict=True))}
+    for row in CUSTOMERS
 }
 
-SCHOOL_PROMPT = "What was the name of your first school?"
-CITY_PROMPT = "In which Sri Lankan city were you born?"
+_seed_hashes: dict[tuple[str, str], str] = {}
+
+
+def _seed_hash(customer_id: str, code: str, answer: str) -> str:
+    """Argon2id of a demonstration answer, computed once per process: the answers are public fictional data, and hashing
+    eighty of them for every test database would slow the test suite for no gain."""
+    key = (customer_id, code)
+    if key not in _seed_hashes:
+        _seed_hashes[key] = hash_secret(answer, code)
+    return _seed_hashes[key]
+
 
 # days_ago, customer, amount, status, score, decision, payee, new_payee, tx_status
 HISTORY = [
@@ -283,13 +310,19 @@ def seed(session, settings) -> bool:
             totp_enrolled=True,
             status="active",
             restricted=False,
-            security={
-                "school": {"prompt": SCHOOL_PROMPT, "answer_hash": hash_answer(row["school"], settings.answer_pepper)},
-                "city": {"prompt": CITY_PROMPT, "answer_hash": hash_answer(row["city"], settings.answer_pepper)},
-            },
             created_at=now - timedelta(days=120),
         )
         session.add(user)
+        for question in QUESTION_BANK:
+            session.add(
+                SecurityAnswer(
+                    id=nid("sec"),
+                    user_id=row["id"],
+                    code=question["code"],
+                    prompt=question["prompt"],
+                    answer_hash=_seed_hash(row["id"], question["code"], PILOT_ANSWERS[row["id"]][question["code"]]),
+                )
+            )
         by_id[row["id"]] = user
         session.add(
             Device(
