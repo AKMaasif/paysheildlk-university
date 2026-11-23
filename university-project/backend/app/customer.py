@@ -3,7 +3,7 @@
 A customer does not create an account here. The bank already holds the record (name, email, NIC,
 mobile number and account number, added from the console). Registration proves the person typing
 matches that record, takes a live face scan, and lets them choose a password. After that they sign in
-with their username (the name they registered with) and the password.
+with their username (the one they chose, or the one made for them) and the password.
 """
 
 import base64
@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app import ratelimit
-from app.api import _client_ip, _public_user, _session_tokens, require_customer
+from app.api import _client_ip, _public_user, require_customer
 from app.crypto import encrypt
 from app.db import session_scope
 from app.ledger import audit
@@ -42,6 +42,33 @@ NO_MATCH = "These details do not match a BankCylone account. Check them against 
 
 
 # ---------- normalising what people type
+
+USERNAME_RULE = re.compile(r"[a-z0-9][a-z0-9._-]{3,29}")
+
+
+def new_username(session, user_id: str, wanted: str | None, display_name: str) -> str:
+    """The name a customer signs in with. A chosen name must be 4 to 30 letters, digits, dots, dashes or underscores and
+    not already taken (letters are compared in lower case). With none chosen, one is made from the name plus four random
+    characters, so it is neither a guess from the bank's records nor a clash between two people with the same name."""
+    import secrets
+
+    def taken(name: str) -> bool:
+        return session.query(User).filter(User.username == name, User.id != user_id).first() is not None
+
+    chosen = (wanted or "").strip().lower()
+    if chosen:
+        if not USERNAME_RULE.fullmatch(chosen):
+            raise HTTPException(status_code=422, detail="Choose a username of 4 to 30 characters: letters, digits, dot, dash or underscore.")
+        if taken(chosen):
+            raise HTTPException(status_code=409, detail="That username is already taken. Choose another.")
+        return chosen
+    base = re.sub(r"[^a-z0-9]+", ".", display_name.lower()).strip(".")[:20] or "customer"
+    for _ in range(20):
+        candidate = f"{base}-{secrets.token_hex(2)}"
+        if not taken(candidate):
+            return candidate
+    raise HTTPException(status_code=503, detail="Could not make a username. Please choose one.")
+
 
 def clean_name(value: str) -> str:
     return " ".join((value or "").lower().split())
@@ -98,6 +125,9 @@ def mask_phone(phone: str | None) -> str:
 
 # ---------- registration
 
+from app.limits import MAX_FRAMES, Frame, check_frames_total  # noqa: E402
+
+
 class RegisterIn(BaseModel):
     full_name: str = Field(min_length=2, max_length=200)
     email: str = Field(min_length=5, max_length=255)
@@ -106,9 +136,10 @@ class RegisterIn(BaseModel):
     account_number: str = Field(min_length=6, max_length=32)
     password: str = Field(min_length=1, max_length=200)
     confirm_password: str = Field(min_length=1, max_length=200)
-    frames: list[str] = Field(default_factory=list, max_length=20)
-    offsets_ms: list[int] = Field(default_factory=list, max_length=20)
+    frames: list[Frame] = Field(default_factory=list, max_length=MAX_FRAMES)
+    offsets_ms: list[int] = Field(default_factory=list, max_length=MAX_FRAMES)
     challenge: str = Field(default="", max_length=1000)
+    username: str | None = Field(default=None, max_length=40)
 
 
 @router.get("/api/customer/register/challenge")
@@ -157,6 +188,7 @@ def register(body: RegisterIn, request: Request):
     if problem:
         raise HTTPException(status_code=422, detail=problem)
 
+    check_frames_total(body.frames)
     # The face scan is decided here, from the camera frames. The browser cannot claim a pass.
     from app import face
 
@@ -174,7 +206,7 @@ def register(body: RegisterIn, request: Request):
         verdict = analyse(frames)
         if verdict["verdict"] != "live":
             raise HTTPException(status_code=422, detail="The face scan did not pass. Face the camera in good light and try again.")
-        sealed = encrypt(base64.b64encode(frames[0]).decode(), runtime.settings.encryption_key)
+        sealed = encrypt(base64.b64encode(frames[0]).decode(), runtime.settings.encryption_key, "face")
         face_hash = verdict["image_sha256"]
     else:
         try:
@@ -185,14 +217,11 @@ def register(body: RegisterIn, request: Request):
             raise HTTPException(status_code=422, detail="The face scan was not accepted. " + " ".join(enrolled["hints"][:3]))
         sealed, face_hash = enrolled["sealed"], enrolled["hash"]
 
-    username = clean_name(display_name)
     with session_scope() as session:
         user = session.get(User, user_id)
-        taken = session.query(User).filter(User.username == username, User.id != user_id).first()
-        if taken is not None:
-            raise HTTPException(status_code=409, detail="Another customer already uses this name. Ask your branch to help.")
         if user.registered:
             raise HTTPException(status_code=409, detail="This account is already registered. Sign in instead.")
+        username = new_username(session, user_id, body.username, display_name)
         user.username = username
         user.password_hash = hash_password(body.password)
         user.registered = True
@@ -200,6 +229,7 @@ def register(body: RegisterIn, request: Request):
         user.password_changed_at = utcnow()
         user.must_change_password = False
         user.status = "active"
+        user.totp_enrolled = False  # the authenticator is confirmed with a first code before the customer is signed in
         user.face_hash = face_hash
         # The reference images and face templates are kept encrypted. They are never shown back and never sent to a model.
         user.face_ref = sealed
@@ -225,12 +255,15 @@ def register(body: RegisterIn, request: Request):
         None,
         "Welcome to PayShield.lk",
         f"Hello {first},\n\nYour BankCylone account is now registered on PayShield.lk. "
-        f"You sign in with your name and the password you chose.\n\n"
+        f"You sign in with your username ({username}), the password you chose and the 6-digit code from your authenticator app.\n\n"
         "If you did not do this, call BankCylone on the number printed on your card straight away.\n"
         "PayShield.lk will never ask for your password by SMS, email or phone.\n",
     )
     send_sms(user_id, None, "BankCylone: your PayShield.lk account is now registered. If this was not you, call your bank on the number on your card.")
-    return {**_session_tokens(user_id, role), "user": snapshot}
+    from app.api import _pending_step
+
+    _ = role
+    return {**_pending_step(user_id, False), "user": snapshot, "username": username}
 
 
 # ---------- account summary
