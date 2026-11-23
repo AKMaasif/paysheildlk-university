@@ -18,8 +18,10 @@ AGENTS = {
     "Report": ["app/reports.py", "app/report_pdf.py", "app/critic.py"],
     "Analytics": ["app/analytics.py", "app/simbook.py", "app/geo.py"],
 }
-SHARED = ["app/agents/graph.py", "app/agents/tools.py", "app/charters.py", "app/privacy.py"]
-SYSTEM = ["app/api.py", "app/desk.py", "app/customer.py", "app/simulate.py", "app/security.py", "app/ratelimit.py", "app/crypto.py",
+NODES = [f"app/agents/nodes/{name}.py" for name in ("supervisor", "telecom", "banking", "risk", "policy", "alert", "customer", "verification", "release", "response", "report")]
+ROUTES = [f"app/routes/{name}.py" for name in ("common", "auth", "console", "customer", "admin", "demo", "stream", "telco", "health")]
+SHARED = ["app/agents/graph.py", "app/agents/base.py", *NODES, "app/agents/tools.py", "app/charters.py", "app/privacy.py"]
+SYSTEM = ["app/api.py", *ROUTES, "app/desk.py", "app/customer.py", "app/simulate.py", "app/security.py", "app/ratelimit.py", "app/crypto.py",
           "app/config.py", "app/runtime.py", "app/db.py", "app/seed.py", "app/demo.py", "app/faults.py", "app/llm.py", "app/util.py", "app/main.py", "app/models.py"]
 
 
