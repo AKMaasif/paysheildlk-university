@@ -15,6 +15,7 @@ from app.api import router
 from app.config import Settings
 from app.customer import router as customer_router
 from app.desk import router as desk_router
+from app.limits import BodyLimit
 from app.logs import configure_logging
 from app.ops import router as ops_router
 from app.runtime import init_runtime, runtime, start_background, stop_background
@@ -48,6 +49,7 @@ def install_cors(application: FastAPI, origins) -> None:
 
 app = FastAPI(title="PayShield", version="0.1.0", lifespan=lifespan)
 install_cors(app, Settings.from_env().allowed_origins)
+app.add_middleware(BodyLimit)
 
 
 @app.middleware("http")
