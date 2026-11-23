@@ -82,6 +82,7 @@ class Settings:
     ignored_by_mode: tuple[str, ...]  # services that have credentials set but are switched off by the mode
     demo_allowed_phones: tuple[str, ...]
     demo_allowed_emails: tuple[str, ...]
+    trusted_proxies: tuple[str, ...]
     notify_max_per_hour: int
     notify_max_attempts: int
     encryption_key: str
@@ -154,6 +155,7 @@ class Settings:
             ignored_by_mode=tuple(ignored),
             demo_allowed_phones=_list(_get("DEMO_ALLOWED_PHONES")),
             demo_allowed_emails=tuple(item.lower() for item in _list(_get("DEMO_ALLOWED_EMAILS"))),
+            trusted_proxies=tuple(_list(_get("TRUSTED_PROXIES", "127.0.0.1,::1"))),
             notify_max_per_hour=_int("NOTIFY_MAX_PER_HOUR", 0 if production else 20),
             notify_max_attempts=max(1, min(_int("NOTIFY_MAX_ATTEMPTS", 2), 3)),
         )
