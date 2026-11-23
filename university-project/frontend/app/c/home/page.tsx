@@ -128,7 +128,7 @@ export default function CustomerHome() {
     setBusy(true);
     setError("");
     try {
-      await api(`/api/customer/cases/${active.id}/verify`, { portal: "customer", method: "POST", body: JSON.stringify({ answers, liveness: true }) });
+      await api(`/api/customer/cases/${active.id}/verify`, { portal: "customer", method: "POST", body: JSON.stringify({ answers }) });
       setAnswers({});
       await load();
     } catch (err) {
