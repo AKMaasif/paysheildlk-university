@@ -452,7 +452,7 @@ def load_templates(blob: str | None) -> dict | None:
     if not blob:
         return None
     try:
-        plain = decrypt(blob, runtime.settings.encryption_key)
+        plain = decrypt(blob, runtime.settings.encryption_key, "face")
     except Exception:
         # A corrupt or tampered record is the same as no record: the caller falls back to the security questions.
         log.warning("stored face data could not be decrypted")
@@ -483,7 +483,7 @@ def seal(data: dict) -> str:
     from app.crypto import encrypt
     from app.runtime import runtime
 
-    return encrypt(json.dumps(data, separators=(",", ":")), runtime.settings.encryption_key)
+    return encrypt(json.dumps(data, separators=(",", ":")), runtime.settings.encryption_key, "face")
 
 
 def enroll(frames, offsets_ms, token: str | None) -> dict:
