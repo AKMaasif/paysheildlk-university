@@ -5,6 +5,7 @@ import time
 from datetime import timedelta
 
 import pytest
+from helpers import live_selfie
 
 from app.agents.runner import (
     begin_case,
@@ -114,7 +115,7 @@ def test_a_stale_timeout_for_a_case_that_already_moved_on_is_ignored(boot):
 
 def test_a_late_answer_for_the_wrong_phase_is_refused(boot):
     case_id = waiting()
-    assert resume_case(case_id, {"liveness": "pass"}, "waiting_liveness") is False
+    assert resume_case(case_id, live_selfie(), "waiting_liveness") is False
     assert state(case_id)[0] == "waiting_customer"
 
 
