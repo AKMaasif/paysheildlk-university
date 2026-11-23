@@ -16,7 +16,8 @@ from app import ops
 # bucket -> (attempts allowed, window in seconds)
 LIMITS: dict[str, tuple[int, int]] = {
     # Failed passwords per account, and all attempts per client address.
-    "login_fail": (5, 15 * 60),
+    "login_fail": (5, 15 * 60),  # per username and client address, so one attacker cannot lock a victim out everywhere
+    "login_fail_user": (30, 15 * 60),  # per username across every address: slows a spread-out guessing run
     "login_ip": (30, 15 * 60),
     # Failed authenticator codes per account. Six digits must not be guessable.
     "totp_fail": (5, 10 * 60),
