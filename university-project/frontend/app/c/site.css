@@ -343,3 +343,10 @@
 
 /* Links inside a line of text must not rely on colour alone. */
 .cs-auth-top a, .cs-switch a, .cs-narrow p a, .cs-faq a { text-decoration: underline; text-underline-offset: 3px; }
+
+.cs-step-title { font-size: 20px; margin: 0 0 8px; }
+.cs-qr { display: grid; justify-items: center; gap: 10px; margin: 14px 0 18px; }
+.cs-qr img { border: 1px solid var(--cs-line); border-radius: 10px; padding: 8px; background: #fff; }
+.cs-qr code { word-break: break-all; font-size: 13px; }
+.cs-code { font-size: 24px; letter-spacing: 0.4em; text-align: center; font-variant-numeric: tabular-nums; }
+.cs-notice { background: #eef7f3; border: 1px solid var(--cs-line); border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; }
