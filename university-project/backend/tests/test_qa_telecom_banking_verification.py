@@ -192,11 +192,14 @@ def test_legacy_liveness_rejects_stills_flat_small_and_missing(frames, why):
     assert out["verdict"] == "fake" and any(why in r for r in out["reasons"])
 
 
-def test_an_explicit_verdict_overrides_frames_and_empty_frames_are_ignored():
-    assert liveness.analyse(verdict="pass")["verdict"] == "live"
-    assert liveness.analyse([FRAME_A, FRAME_B], verdict="fail")["verdict"] == "fake"
+def test_there_is_no_way_to_pass_a_verdict_in_only_frames_decide_and_empty_frames_are_ignored():
+    import inspect
+
+    assert list(inspect.signature(liveness.analyse).parameters) == ["frames"]
+    with pytest.raises(TypeError):
+        liveness.analyse(verdict="pass")
+    assert liveness.analyse([]) ["verdict"] == "fake" and liveness.analyse([FRAME_A, FRAME_A])["verdict"] == "fake"
     assert liveness.analyse([b"", FRAME_A, b"", FRAME_B])["verdict"] == "live"
-    assert liveness.analyse(verdict="other", frames=[])["verdict"] == "fake"
 
 
 def test_the_liveness_digest_is_stable_for_the_same_frames():
@@ -242,7 +245,7 @@ def test_birth_dates_in_common_formats_compare_equal(raw, expected):
 
 def test_answers_are_salted_so_equal_answers_have_different_hashes():
     a, b = answers.hash_secret("blue", "colour"), answers.hash_secret("blue", "colour")
-    assert a != b and a.startswith("pbkdf2$") and answers.verify_secret("Blue ", a, "colour") and answers.verify_secret("blue", b, "colour")
+    assert a != b and a.startswith("$argon2id$") and answers.verify_secret("Blue ", a, "colour") and answers.verify_secret("blue", b, "colour")
     assert not answers.verify_secret("green", a, "colour")
 
 
