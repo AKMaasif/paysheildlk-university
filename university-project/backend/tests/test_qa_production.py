@@ -96,6 +96,7 @@ ADMIN = {"email": "admin@bank.example", "password": GOOD_PASSWORD, "portal": "op
 DRILL_CALLS = [
     ("POST", "/api/demo/trigger", {"customer_id": "x", "scenario": "sim_swap_transfer"}), ("POST", "/api/demo/unregister", {"customer_id": "x"}), ("POST", "/api/demo/reset", {}),
     ("GET", "/api/demo/assist?customer_id=x", None), ("GET", "/api/demo/customers", None),
+    ("POST", "/api/demo/nudge", {"case_id": "x", "action": "realert"}),
     ("POST", "/api/simulate/run", {"scenario": "sim_swap_transfer"}), ("POST", "/api/simulate/clear", {}),
 ]
 
