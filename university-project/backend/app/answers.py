@@ -1,11 +1,16 @@
 import hashlib
 import hmac
-import os
 import re
+import unicodedata
 from datetime import datetime
 
-# Per-answer PBKDF2-SHA256. The salt is stored beside the digest.
-_ROUNDS = 20_000
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
+
+# One scheme for every security answer: Argon2id with its own random salt (the OWASP minimum cost, because a round
+# checks several answers). Hashes written by older versions still verify and are replaced on the next correct answer.
+_hasher = PasswordHasher(time_cost=2, memory_cost=19_456, parallelism=1)
+_ROUNDS = 20_000  # the old PBKDF2 setting, kept only to read old rows
 
 QUESTION_BANK = [
     {"code": "colour", "prompt": "What is your favourite colour?"},
@@ -20,10 +25,12 @@ QUESTION_BANK = [
 
 
 def normalise_answer(answer: str, code: str = "") -> str:
-    text = re.sub(r"\s+", " ", (answer or "").strip().lower())
+    """The one clean-up every answer goes through, when it is saved and when it is checked: compatibility-normalise, lower-case,
+    and keep only letters and digits, so capitals, spaces and punctuation never decide a match. Dates are read as dates."""
+    text = unicodedata.normalize("NFKC", answer or "").casefold().strip()
     if code == "dob":
         return normalise_dob(text)
-    return text
+    return "".join(ch for ch in text if ch.isalnum())
 
 
 def normalise_dob(value: str) -> str:
@@ -42,23 +49,32 @@ def normalise_dob(value: str) -> str:
 
 
 def hash_secret(answer: str, code: str = "") -> str:
-    salt = os.urandom(16)
-    material = normalise_answer(answer, code).encode()
-    digest = hashlib.pbkdf2_hmac("sha256", material, salt, _ROUNDS)
-    return f"pbkdf2${salt.hex()}${digest.hex()}"
+    return _hasher.hash(normalise_answer(answer, code))
 
 
-def verify_secret(answer: str, stored: str, code: str = "") -> bool:
-    try:
-        scheme, salt_hex, digest_hex = stored.split("$")
-    except ValueError:
-        return False
-    if scheme != "pbkdf2":
-        return False
-    material = normalise_answer(answer, code).encode()
-    try:
-        salt = bytes.fromhex(salt_hex)
-    except ValueError:
-        return False
-    digest = hashlib.pbkdf2_hmac("sha256", material, salt, _ROUNDS)
-    return hmac.compare_digest(digest.hex(), digest_hex)
+def is_current(stored: str) -> bool:
+    return (stored or "").startswith("$argon2id$")
+
+
+def verify_secret(answer: str, stored: str, code: str = "", pepper: str = "") -> bool:
+    """True when the answer matches. Reads the current Argon2id format and the two older ones."""
+    stored = stored or ""
+    if is_current(stored):
+        try:
+            return _hasher.verify(stored, normalise_answer(answer, code))
+        except (VerifyMismatchError, VerificationError, InvalidHashError):
+            return False
+    if stored.startswith("pbkdf2$"):  # version 1: salted PBKDF2, whitespace-only clean-up
+        try:
+            _scheme, salt_hex, digest_hex = stored.split("$")
+            salt = bytes.fromhex(salt_hex)
+        except ValueError:
+            return False
+        old = re.sub(r"\s+", " ", (answer or "").strip().lower())
+        if code == "dob":
+            old = normalise_dob(old)
+        return hmac.compare_digest(hashlib.pbkdf2_hmac("sha256", old.encode(), salt, _ROUNDS).hex(), digest_hex)
+    if re.fullmatch(r"[0-9a-f]{64}", stored):  # version 0: unsalted SHA-256 with a fixed pepper (old demonstration rows)
+        old = re.sub(r"[^a-z0-9]", "", (answer or "").lower())
+        return hmac.compare_digest(hashlib.sha256(f"{pepper}:{old}".encode()).hexdigest(), stored)
+    return False
