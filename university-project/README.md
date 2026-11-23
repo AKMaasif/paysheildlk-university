@@ -35,7 +35,7 @@ flowchart TD
 
 The supervisor graph is LangGraph. Routing is explicit. While the customer is answering, the graph is paused with `interrupt()` and a Postgres checkpointer (SQLite if Postgres is not the app database). Resume continues the same case.
 
-After a customer says the payment was theirs, the desk asks for a live camera selfie and then up to four rounds of three knowledge questions. A second fake selfie, or a fourth failed round, blocks the payment. Answers are salted hashes. The authenticator secret is encrypted with AES-256-GCM (`ENCRYPTION_KEY`). Agent handoffs can be checked with `HMAC_KEY`. `TEXTLK_API_KEY` and `SMTP_*` turn on the real SMS and email drivers; empty values stay on the log driver.
+After a customer says the payment was theirs, the desk asks for a live camera selfie and then up to four rounds of three knowledge questions. A second fake selfie, or a fourth failed round, blocks the payment. Customers sign in with their username and password and then a 6-digit code from an authenticator app; the password alone never opens a session. Security answers are Argon2id hashes with one shared clean-up (each customer has eight questions and a round draws three). The authenticator secret and face data are encrypted with AES-256-GCM, and email, phone, NIC and account number are stored encrypted (AES-256-GCM-SIV, so lookups still work); every key is derived from `ENCRYPTION_KEY`, which must be at least 32 characters, and a wrong key stops the service at start. Agent handoffs can be checked with `HMAC_KEY`. `TEXTLK_API_KEY` and `SMTP_*` turn on the real SMS and email drivers; empty values stay on the log driver.
 
 | Piece | Role |
 | --- | --- |
@@ -171,7 +171,8 @@ Set `FACE_ENGINE=legacy` to use the old two-frame demo check (no recognition), a
 | --- | --- |
 | Passwords | Argon2id (`argon2-cffi`). Older PBKDF2 hashes are replaced on the next successful sign-in. |
 | Security answers | Per-answer salted PBKDF2-SHA256. The app never says which answer in a round was wrong. |
-| Face-scan reference, personal details | AES-256-GCM with `ENCRYPTION_KEY`. |
+| Face-scan reference, authenticator secret | AES-256-GCM, keys derived from `ENCRYPTION_KEY` with HKDF. |
+| Email, phone, NIC, account number | AES-256-GCM-SIV in the database (equal values give equal ciphertext, so lookups work). Still in plain text elsewhere: the telecom event feed (`sim_events.phone`), the audit log actor names, notification and report text. |
 | Sessions | 30-minute access tokens, 12-hour refresh tokens. A refresh token cannot be used as an access token. |
 | Brute force | 5 failed passwords per account and 5 failed registration matches per account number and 6 wrong current passwords per customer inside the window return 429. Step-up answers and selfies are rate limited per case. |
 | Step-up | The selfie verdict and the question grading are made on the server. A client cannot claim a pass, answer another customer's case, or skip a question. |
@@ -206,14 +207,14 @@ Sign in on the console as `analyst@payshield.lk` / `pilot-analyst`.
 
 1. Open **Demo control**. Leave the customer on Nimal Perera and the scenario on **SIM swap and Rs. 200,000 to a new payee**. Trigger the case.
 2. Open **Live Agent Activity**. Telecom and banking run together, risk scores, the rule layer holds the transfer, and the alert lane waits. Click a step. The details pane shows the tool arguments and the result.
-3. On a phone, or another window, open http://localhost:3000/c and choose **Register**. Demo control shows the registration details for the chosen customer (name, email, NIC, mobile, account number). Type them in, take the face scan, and choose a password. Any detail that does not match the BankCylone record is refused.
+3. On a phone, or another window, open http://localhost:3000/c and choose **Register**. Demo control shows the registration details for the chosen customer (name, email, NIC, mobile, account number). Type them in, take the face scan, choose a username (or leave it blank and one is made for you) and a password. Any detail that does not match the BankCylone record is refused. The last step is the authenticator: **Demo control** shows a QR code and key for the chosen customer (a preset secret, so it stays the same). Add it once to an authenticator app on your phone (Google Authenticator, Microsoft Authenticator or similar), then type the 6-digit code the app shows to finish registering.
 4. The question is **Did you make this payment of Rs. 200,000 to K.D. Enterprises?**
-5. **No** blocks the transfer, records a *simulated* SIM-freeze request (no operator is contacted), limits the account, and files a report. **Yes** asks for a live face scan first. After a match (or a likely match) the customer answers rounds of three security questions (for the demo customer: first school `Royal College`, city of birth `Galle`). A mismatching second scan, or a fourth failed round, blocks the payment. An unsure scan gets one more try and then goes to a person with the money held. Before any release the rules read the signals once more and stop the release if something worse has arrived.
+5. **No** blocks the transfer, records a *simulated* SIM-freeze request (no operator is contacted), limits the account, and files a report. **Yes** asks for a live face scan first. After a match (or a likely match) the customer answers rounds of three security questions (each round draws three of the customer's eight questions; **Demo control** lists the eight answers). A mismatching second scan, or a fourth failed round, blocks the payment. An unsure scan gets one more try and then goes to a person with the money held. Before any release the rules read the signals once more and stop the release if something worse has arrived.
 6. Download the report from the case file or from **Reports** (markdown or PDF).
 7. To show the other rules without waiting: **Port-out, password reset, and Rs. 800,000** blocks immediately. **Routine bill of Rs. 4,850** on Dilani Wijesinghe releases without asking.
 8. **Run the 3-minute re-alert now** and **Run the 10-minute escalation now** call the same handlers the timer uses. Left alone, the realert is at 3 minutes and escalation at 10, and the transfer stays held.
 9. **Reset demo state** deletes only rows created from Demo control. **Return to first-time state** puts a customer back to unregistered so the registration can be shown again.
-10. After the alert is settled the customer is asked to change the password: current password, new password, re-enter. The change is stored, and an email and an SMS confirm it. From then on they log in with their username (their full name) and the password.
+10. After the alert is settled the customer is asked to change the password: current password, new password, re-enter. The change is stored, and an email and an SMS confirm it. From then on they log in with their username and the password, and then the site asks for the 6-digit code from the authenticator app. A code works once; if you log in twice within a minute, wait for the app to show the next one. An account with no authenticator (for example one made before codes were required) is asked to set one up at its next login.
 
 A bank supervisor (`supervisor@payshield.lk` / `pilot-supervisor`) is scoped to BankCylone and can release or block a held payment from **Transactions on Hold**. The auditor is read-only. The super admin (`admin@payshield.lk` / `pilot-admin`) sees Administration.
 
@@ -238,7 +239,11 @@ Push is device-bound. The customer site registers the browser when the customer 
 ## Layout
 
 ```
-backend/app/agents/graph.py    supervisor graph
+backend/app/agents/graph.py    how the agent steps connect (the case graph)
+backend/app/agents/nodes/      one file per agent step (supervisor, telecom, banking, risk, policy, alert, customer, verification, release, response, report)
+backend/app/agents/base.py     what the steps share: case state, signed handoffs, the tool wrapper
+backend/app/routes/            HTTP routes by area (auth, console, customer, admin, demo, telco, stream, health)
+backend/app/api.py             assembles the route modules into one router
 backend/app/risk.py            score and the hold / block / release rules
 backend/app/facts.py           CAMARA-shaped SIM swap reads
 backend/app/llm.py             Gemini, Meta, mock
