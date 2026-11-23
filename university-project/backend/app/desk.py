@@ -10,6 +10,7 @@ from app.charters import CHARTERS
 from app.db import session_scope
 from app.emergency import breaker_status
 from app.ledger import audit, verify_audit_chain
+from app.limits import MAX_FRAMES, Frame, check_frames_total
 from app.models import Case, SecurityAnswer, User
 from app.runtime import runtime
 from app.security import hash_password
@@ -208,8 +209,17 @@ def analytics(authorization: str | None = Header(default=None)):
     return compute()
 
 
+class LivenessIn(BaseModel):
+    """The camera frames of a selfie, when each was taken, and the signed challenge. Nothing else is read: a client cannot
+    send a verdict."""
+
+    frames: list[Frame] = Field(default_factory=list, max_length=MAX_FRAMES)
+    offsets_ms: list[int] = Field(default_factory=list, max_length=MAX_FRAMES)
+    challenge: str = Field(default="", max_length=1000)
+
+
 @router.post("/api/customer/cases/{case_id}/liveness")
-def customer_liveness(case_id: str, body: dict, authorization: str | None = Header(default=None)):
+def customer_liveness(case_id: str, body: LivenessIn, authorization: str | None = Header(default=None)):
     from app.agents.runner import resume_case
     from app.api import current_user
 
@@ -220,16 +230,17 @@ def customer_liveness(case_id: str, body: dict, authorization: str | None = Head
         case = session.get(Case, case_id)
         if case is None or case.customer_id != user.id:
             raise HTTPException(status_code=404, detail="Case not found")
+    check_frames_total(body.frames)
     ratelimit.take("liveness", case_id)
     frames = []
-    for item in body.get("frames") or []:
+    for item in body.frames:
         try:
             frames.append(base64.b64decode(item, validate=True))
         except Exception as exc:
             raise HTTPException(status_code=422, detail="A camera frame could not be read. Please scan again.") from exc
-    offsets = [int(x) for x in (body.get("offsets_ms") or []) if isinstance(x, (int, float))]
+    offsets = list(body.offsets_ms)
     # Only the camera frames, their times and the signed challenge go to the check. A client-supplied verdict is never forwarded.
-    ok = resume_case(case_id, {"frames": frames, "offsets_ms": offsets, "challenge": str(body.get("challenge") or "")}, "waiting_liveness")
+    ok = resume_case(case_id, {"frames": frames, "offsets_ms": offsets, "challenge": body.challenge}, "waiting_liveness")
     if not ok:
         raise HTTPException(status_code=409, detail="This payment is not waiting for a selfie")
     from app.api import _customer_case_state
