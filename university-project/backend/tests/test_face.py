@@ -5,7 +5,7 @@ import time
 import pytest
 from face_fakes import FakeEngine, burst, frame, near, turn_left_then_open, vec
 from fastapi.testclient import TestClient
-from helpers import PASSWORD, record
+from helpers import PASSWORD, correct_answers, record
 
 from app import face
 from app.agents.runner import begin_case, resume_case
@@ -238,7 +238,7 @@ def test_poor_quality_never_counts_as_a_strike():
 
 def test_templates_are_stored_encrypted_and_hold_several_faces():
     sealed = _enrol_sealed()
-    assert sealed.startswith("gcm$")
+    assert sealed.startswith("gcm2$")
     data = face.load_templates(sealed)
     assert data["version"] == face.MODEL_VERSION and 3 <= len(data["embeddings"]) <= face.MAX_TEMPLATES and 1 <= len(data["images"]) <= face.MAX_IMAGES
 
@@ -335,7 +335,7 @@ def test_a_matching_face_goes_on_to_the_questions_and_the_questions_release_the_
     assert _submit(case_id, near(ENROLLED, 0.25))
     status, tx, verdict, score, prompt = _status(case_id)
     assert status == "waiting_verification" and verdict == "match" and score >= 80
-    assert resume_case(case_id, {"answers": {"school": "Royal College", "city": "Galle"}}, "waiting_verification")
+    assert resume_case(case_id, {"answers": correct_answers(case_id)}, "waiting_verification")
     assert _status(case_id)[:2] == ("closed_released", "released")
 
 
@@ -351,7 +351,7 @@ def test_a_very_confident_match_that_also_passes_the_questions_refreshes_the_tem
     before = len(face.load_templates(sealed)["embeddings"])
     case_id = _to_selfie()
     _submit(case_id, near(ENROLLED, 0.18, seed=300))
-    resume_case(case_id, {"answers": {"school": "Royal College", "city": "Galle"}}, "waiting_verification")
+    resume_case(case_id, {"answers": correct_answers(case_id)}, "waiting_verification")
     with session_scope() as session:
         after = len(face.load_templates(session.get(User, "cus_nimal").face_ref)["embeddings"])
     assert after == before + 1
@@ -418,7 +418,7 @@ def test_a_still_image_or_an_expired_challenge_does_not_pass():
 def test_the_client_cannot_claim_a_pass():
     _customer_with_face()
     case_id = _to_selfie()
-    resume_case(case_id, {"liveness": "pass", "frames": [], "offsets_ms": []}, "waiting_liveness")
+    resume_case(case_id, {"frames": [], "offsets_ms": []}, "waiting_liveness")
     assert _status(case_id)[0] == "waiting_liveness" and _status(case_id)[2] == "poor_quality"
 
 
@@ -469,14 +469,16 @@ def test_registration_stores_the_scan_encrypted_and_never_returns_it():
         }
         done = client.post("/api/customer/register", json=body)
         assert done.status_code == 200, done.text
-        headers = {"Authorization": "Bearer " + done.json()["token"]}
+        from helpers import authenticate
+
+        headers = {"Authorization": "Bearer " + authenticate(client, done.json())["token"]}
         account = client.get("/api/customer/account", headers=headers).text
         assert "embedding" not in account and "images" not in account
         again = client.post("/api/customer/register", json=body)
         assert again.status_code in {409, 422}
     with session_scope() as session:
         stored = session.get(User, "cus_nimal").face_ref
-    assert stored.startswith("gcm$") and "{" not in stored
+    assert stored.startswith("gcm2$") and "{" not in stored
     assert len(face.load_templates(stored)["embeddings"]) >= 3
 
 
