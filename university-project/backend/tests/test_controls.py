@@ -13,10 +13,10 @@ from app.security import totp_now, totp_valid
 
 def test_answers_are_normalised_and_salted():
     stored = hash_secret("  Royal   College ", "school")
-    assert stored.startswith("pbkdf2$")
+    assert stored.startswith("$argon2id$")
     assert verify_secret("royal college", stored, "school")
     assert not verify_secret("royal", stored, "school")
-    assert normalise_answer("  Royal   College ") == "royal college"
+    assert normalise_answer("  Royal   College! ") == "royalcollege"
     assert normalise_dob("17/11/1990") == "1990-11-17"
 
 
@@ -40,8 +40,7 @@ def test_liveness_two_strikes_are_distinct_from_a_live_pair():
     assert fake["verdict"] == "fake"
     live = analyse([bytes(range(256)) * 5, bytes(range(255, -1, -1)) * 5])
     assert live["verdict"] == "live"
-    explicit = analyse([], "fail")
-    assert explicit["verdict"] == "fake"
+    assert analyse([])["verdict"] == "fake"  # no frames, no pass: there is no verdict argument to claim one with
 
 
 def test_charter_refuses_a_tool_outside_the_allowlist():
@@ -96,6 +95,6 @@ def test_audit_chain_detects_a_tampered_row(boot):
 
 
 def test_pii_round_trip():
-    blob = encrypt("+94771234567", "unit-key")
+    blob = encrypt("+94771234567", "unit-test-key-0123456789-0123456789-abcd")
     assert "+9477" not in blob
-    assert decrypt(blob, "unit-key") == "+94771234567"
+    assert decrypt(blob, "unit-test-key-0123456789-0123456789-abcd") == "+94771234567"
