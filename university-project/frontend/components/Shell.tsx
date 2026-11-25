@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Icon, Logo } from "@/components/Icons";
-import { api, clearToken, getToken, getUser, wsUrl } from "@/lib/api";
+import { api, clearSession, getUser, isSignedIn, wsUrl } from "@/lib/api";
 import { clock } from "@/lib/format";
 
 export type Operator = {
@@ -68,7 +68,7 @@ type Health = {
   recipients_cleared?: { phones: number; emails: number };
   realert_seconds?: number;
   escalate_seconds?: number;
-  llm: { primary: string; gemini_configured: boolean; meta_configured: boolean };
+  llm: { primary: string; meta_configured: boolean; grok_configured: boolean };
 };
 
 type Severity = { crit: number; high: number; med: number; low: number };
@@ -150,7 +150,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const [now, setNow] = useState("");
 
   useEffect(() => {
-    if (!getToken()) {
+    if (!isSignedIn("operator")) {
       router.replace("/signin");
       return;
     }
@@ -229,16 +229,18 @@ export function Shell({ children }: { children: React.ReactNode }) {
   if (!ready) return <div className="signin-page">Opening PayShield…</div>;
 
   function signOut() {
-    clearToken("operator");
+    void clearSession("operator");
     router.replace("/signin");
   }
 
-  const offline = !health?.llm.gemini_configured && !health?.llm.meta_configured;
+  const offline = !health?.llm.meta_configured && !health?.llm.grok_configured;
   const engineLabel = offline
     ? "OFFLINE RULES ENGINE"
-    : health?.llm.gemini_configured
-      ? "GEMINI · META FALLBACK"
-      : "META";
+    : health?.llm.meta_configured
+      ? health.llm.grok_configured
+        ? "META · GROK FALLBACK"
+        : "META"
+      : "GROK";
   const initials = (user?.full_name || "?")
     .split(" ")
     .slice(0, 2)
