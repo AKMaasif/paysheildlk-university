@@ -27,15 +27,17 @@ beforeEach(async () => {
   location.href = "/c/home";
 });
 
-test("the two portals keep separate tokens", () => {
-  api.setToken("operator", "op-token", "op-refresh");
-  api.setToken("customer", "cu-token");
-  assert.equal(api.getToken("operator"), "op-token");
-  assert.equal(api.getToken("customer"), "cu-token");
-  api.clearToken("operator");
-  assert.equal(api.getToken("operator"), "");
-  assert.equal(api.getToken("customer"), "cu-token");
-  assert.equal(store.has("payshield_operator_refresh"), false);
+test("the two portals are tracked separately, and the only thing kept is the person's public details", () => {
+  assert.equal(api.isSignedIn("operator"), false);
+  api.setUser("operator", { id: "op" });
+  api.setUser("customer", { id: "cu" });
+  assert.equal(api.isSignedIn("operator"), true);
+  assert.equal(api.isSignedIn("customer"), true);
+  store.delete(api.userKey("operator"));
+  assert.equal(api.isSignedIn("operator"), false);
+  assert.equal(api.isSignedIn("customer"), true);
+  // no token of any kind is ever written to storage
+  for (const key of store.keys()) assert.ok(!/token|refresh/i.test(key), key);
 });
 
 test("a stored user comes back, and a broken one is ignored", () => {
@@ -46,21 +48,22 @@ test("a stored user comes back, and a broken one is ignored", () => {
   assert.equal(api.getUser("operator"), null);
 });
 
-test("a request carries the right portal's token and goes through the /backend proxy", async () => {
-  api.setToken("customer", "cu-token");
+test("a request goes through the /backend proxy asking for cookie sessions, with the site header and no token", async () => {
+  api.setUser("customer", { id: "cu" });
   answers = [json(200, { ok: true })];
   assert.deepEqual(await api.api("/api/customer/home", { portal: "customer" }), { ok: true });
   assert.equal(calls[0].url, "/backend/api/customer/home");
-  assert.equal(calls[0].headers.get("authorization"), "Bearer cu-token");
+  assert.equal(calls[0].headers.get("authorization"), null);
+  assert.equal(calls[0].headers.get("x-session-mode"), "cookie");
+  assert.equal(calls[0].headers.get("x-requested-with"), "payshield");
 });
 
-test("a body is sent as JSON, and an explicit Authorization header is respected", async () => {
-  api.setToken("operator", "op-token");
+test("a body is sent as JSON, and an explicit Authorization header (the half-finished sign-in) is respected", async () => {
   answers = [json(200, {}), json(200, {})];
   await api.api("/api/x", { method: "POST", body: JSON.stringify({ a: 1 }) });
   assert.equal(calls[0].headers.get("content-type"), "application/json");
-  await api.api("/api/x", { headers: { Authorization: "Bearer other" } });
-  assert.equal(calls[1].headers.get("authorization"), "Bearer other");
+  await api.api("/api/x", { headers: { Authorization: "Bearer pending" } });
+  assert.equal(calls[1].headers.get("authorization"), "Bearer pending");
 });
 
 test("an error answer becomes an ApiError with the server's message and status", async () => {
@@ -72,22 +75,24 @@ test("an error answer becomes an ApiError with the server's message and status",
   await assert.rejects(api.api("/api/x"), (err: any) => err.status === 400 && typeof err.message === "string");
 });
 
-test("an expired access token is renewed once with the refresh token and the request is retried", async () => {
-  api.setToken("customer", "old", "refresh-1");
-  answers = [json(401, { detail: "expired" }), json(200, { token: "new" }), json(200, { ok: 1 })];
+test("an expired access cookie is renewed once from the refresh cookie and the request is retried", async () => {
+  api.setUser("customer", { id: "cu" });
+  answers = [json(401, { detail: "expired" }), json(200, { session: "cookie" }), json(200, { ok: 1 })];
   assert.deepEqual(await api.api("/api/customer/home", { portal: "customer" }), { ok: 1 });
   assert.equal(calls[1].url, "/backend/api/auth/refresh");
-  assert.equal(api.getToken("customer"), "new");
-  assert.equal(calls[2].headers.get("authorization"), "Bearer new");
+  assert.deepEqual(JSON.parse(String(calls[1].body)), { portal: "customer" }); // no token travels in the request
+  assert.equal(calls[1].headers.get("x-requested-with"), "payshield");
+  assert.equal(calls[2].url, "/backend/api/customer/home");
+  assert.equal(api.isSignedIn("customer"), true);
 });
 
 test("several requests that expire together share one refresh", async () => {
-  api.setToken("customer", "old", "refresh-1");
+  api.setUser("customer", { id: "cu" });
   let refreshes = 0;
-  (globalThis as any).fetch = async (url: string, init: RequestInit = {}) => {
-    const h = new Headers(init.headers);
-    if (url.endsWith("/auth/refresh")) { refreshes++; return json(200, { token: "new" })(url); }
-    return h.get("authorization") === "Bearer new" ? json(200, { ok: 1 })(url) : json(401, { detail: "expired" })(url);
+  let renewed = false;
+  (globalThis as any).fetch = async (url: string) => {
+    if (url.endsWith("/auth/refresh")) { refreshes++; renewed = true; return json(200, { session: "cookie" })(url); }
+    return renewed ? json(200, { ok: 1 })(url) : json(401, { detail: "expired" })(url);
   };
   try {
     await Promise.all([api.api("/api/a", { portal: "customer" }), api.api("/api/b", { portal: "customer" }), api.api("/api/c", { portal: "customer" })]);
@@ -103,24 +108,33 @@ test("several requests that expire together share one refresh", async () => {
 });
 
 test("when the refresh fails the person is signed out and sent to their own login page", async () => {
-  api.setToken("customer", "old", "refresh-1");
+  api.setUser("customer", { id: "cu" });
   answers = [json(401, {}), json(401, {})];
   await assert.rejects(api.api("/api/customer/home", { portal: "customer" }));
-  assert.equal(api.getToken("customer"), "");
+  assert.equal(api.isSignedIn("customer"), false);
   assert.equal(location.href, "/c/login");
-  api.setToken("operator", "old");
-  answers = [json(401, {})];
+  api.setUser("operator", { id: "op" });
+  answers = [json(401, {}), json(401, {})];
   await assert.rejects(api.api("/api/overview"));
+  assert.equal(api.isSignedIn("operator"), false);
   assert.equal(location.href, "/signin");
 });
 
 test("a wrong current password is shown as an error and does not sign the customer out", async () => {
-  api.setToken("customer", "good", "refresh-1");
+  api.setUser("customer", { id: "cu" });
   answers = [json(401, { detail: "Your current password is not correct." })];
   await assert.rejects(api.api("/api/customer/password", { portal: "customer", method: "POST", body: "{}" }), (err: any) => err.message === "Your current password is not correct.");
-  assert.equal(api.getToken("customer"), "good");
+  assert.equal(api.isSignedIn("customer"), true);
   assert.equal(location.href, "/c/home");
   assert.equal(calls.length, 1, "no refresh was attempted");
+});
+
+test("a wrong authenticator code during set-up is an error on the form, not a sign-out", async () => {
+  api.setUser("customer", { id: "cu" });
+  answers = [json(401, { detail: "That code is not valid" })];
+  await assert.rejects(api.api("/api/customer/totp/confirm", { portal: "customer", method: "POST", body: "{}" }), (err: any) => err.status === 401);
+  assert.equal(api.isSignedIn("customer"), true);
+  assert.equal(calls.length, 1);
 });
 
 test("a failed sign-in is an error on the form, not a redirect", async () => {
@@ -132,24 +146,43 @@ test("a failed sign-in is an error on the form, not a redirect", async () => {
 test("already on the login page, a 401 does not loop back to it", async () => {
   location.pathname = "/c/login";
   location.href = "/c/login?x=1";
-  api.setToken("customer", "old");
-  answers = [json(401, {})];
+  api.setUser("customer", { id: "cu" });
+  answers = [json(401, {}), json(401, {})];
   await assert.rejects(api.api("/api/customer/home", { portal: "customer" }));
   assert.equal(location.href, "/c/login?x=1");
 });
 
-test("the live-stream address uses the page's host, the right scheme, and encodes the token", () => {
-  api.setToken("operator", "a b/c");
+test("signing out forgets the person here and asks the server to clear the cookies for that portal only", async () => {
+  api.setUser("customer", { id: "cu" });
+  api.setUser("operator", { id: "op" });
+  answers = [json(200, { ok: true })];
+  await api.clearSession("customer");
+  assert.equal(api.isSignedIn("customer"), false);
+  assert.equal(api.isSignedIn("operator"), true);
+  assert.equal(calls[0].url, "/backend/api/auth/logout");
+  assert.deepEqual(JSON.parse(String(calls[0].body)), { portal: "customer" });
+  assert.equal(calls[0].headers.get("x-requested-with"), "payshield");
+});
+
+test("signing out still forgets the person if the server cannot be reached", async () => {
+  api.setUser("operator", { id: "op" });
+  answers = [() => { throw new Error("offline"); }];
+  await api.clearSession("operator");
+  assert.equal(api.isSignedIn("operator"), false);
+});
+
+test("the live-stream address names the portal and carries no token", () => {
   delete process.env.NEXT_PUBLIC_WS_URL;
   delete process.env.NEXT_PUBLIC_WS_PORT;
-  assert.equal(api.wsUrl("operator"), "ws://example.test:8000/ws?token=a%20b%2Fc");
+  assert.equal(api.wsUrl("operator"), "ws://example.test:8000/ws?portal=operator");
+  assert.equal(api.wsUrl("customer"), "ws://example.test:8000/ws?portal=customer");
   location.protocol = "https:";
   process.env.NEXT_PUBLIC_WS_PORT = "9000";
-  assert.equal(api.wsUrl("operator"), "wss://example.test:9000/ws?token=a%20b%2Fc");
+  assert.equal(api.wsUrl("operator"), "wss://example.test:9000/ws?portal=operator");
   process.env.NEXT_PUBLIC_WS_URL = "wss://stream.example/ws";
-  assert.equal(api.wsUrl("operator"), "wss://stream.example/ws?token=a%20b%2Fc");
+  assert.equal(api.wsUrl("operator"), "wss://stream.example/ws?portal=operator");
   process.env.NEXT_PUBLIC_WS_URL = "wss://stream.example/ws?room=1";
-  assert.equal(api.wsUrl("operator"), "wss://stream.example/ws?room=1&token=a%20b%2Fc");
+  assert.equal(api.wsUrl("customer"), "wss://stream.example/ws?room=1&portal=customer");
   location.protocol = "http:";
   delete process.env.NEXT_PUBLIC_WS_URL;
   delete process.env.NEXT_PUBLIC_WS_PORT;
