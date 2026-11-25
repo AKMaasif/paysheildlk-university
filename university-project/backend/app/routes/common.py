@@ -21,6 +21,7 @@ from app.security import (
     REFRESH_MINUTES,
     create_token,
     decode_token,
+    is_revoked,
 )
 from app.util import (
     OPERATOR_ROLES,
@@ -65,6 +66,18 @@ def _client_ip(request: Request | None) -> str:
     return peer
 
 
+def finish_session(request: Request, response: Response, user_id: str, role: str, snapshot: dict) -> dict:
+    """End a successful sign-in. A browser that asked for cookies gets them, and the body carries only the user's public
+    details. Any other client gets the tokens in the body."""
+    from app import sessions
+
+    tokens = _session_tokens(user_id, role)
+    if sessions.wants_cookies(request):
+        sessions.set_session(response, sessions.portal_for_role(role), tokens["token"], tokens["refresh_token"])
+        return {"session": "cookie", "user": snapshot}
+    return {**tokens, "user": snapshot}
+
+
 def _session_tokens(user_id: str, role: str) -> dict:
     return {
         "token": create_token(runtime.settings, user_id, role, purpose="access"),
@@ -88,6 +101,8 @@ def _user_from_header(authorization: str | None) -> User:
         user = session.get(User, payload["sub"])
         if user is None or user.status != "active":
             raise HTTPException(status_code=401, detail="Account is not active")
+        if is_revoked(session, payload, user):
+            raise HTTPException(status_code=401, detail="Session ended")
         session.expunge(user)
         return user
 
