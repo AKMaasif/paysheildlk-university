@@ -58,7 +58,7 @@ try {
     FACE_ENGINE: "legacy",
     RATE_LIMIT_SCALE: "20",
     DEMO_ASSIST: "true",
-    GEMINI_API_KEY: "",
+    XAI_API_KEY: "",
     META_API_KEY: "",
     REDIS_URL: "",
   });
