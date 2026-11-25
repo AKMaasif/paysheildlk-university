@@ -154,10 +154,10 @@ def test_a_quiet_book_reports_no_hot_spots(boot):
 
 def test_a_reworded_brief_with_an_invented_number_is_dropped(boot, monkeypatch):
     analytics._brief_cache.clear()
-    monkeypatch.setattr(runtime.settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(runtime.settings, "meta_api_key", "test-key")
 
     class Reply:
-        provider = "gemini"
+        provider = "meta"
 
         def __init__(self, text):
             self.text = text
@@ -169,7 +169,7 @@ def test_a_reworded_brief_with_an_invented_number_is_dropped(boot, monkeypatch):
     assert (text, source) == ("fallback text", "rules")
     analytics._brief_cache.clear()
     text, source = analytics._brief(facts + " ", ["fallback text"])
-    assert (text, source) == ("Payments were checked.", "gemini")
+    assert (text, source) == ("Payments were checked.", "meta")
 
 
 def test_the_brief_comes_from_rules_when_no_model_is_configured(boot, monkeypatch):
