@@ -19,7 +19,7 @@ type Settings = {
   escalate_seconds: number;
   step_delay_ms: number;
   timezone: string;
-  llm: { primary: string; gemini_configured: boolean; meta_configured: boolean; gemini_model: string; meta_model: string; fallback: string };
+  llm: { primary: string; meta_configured: boolean; grok_configured: boolean; meta_model: string; grok_model: string; fallback: string };
 };
 
 export default function SettingsPage() {
@@ -31,8 +31,8 @@ export default function SettingsPage() {
   if (!data) return <p className="quiet">Loading settings…</p>;
   const rows: Array<[string, string]> = [
     ["Telecom feed", data.telco === "camara-http" ? "Operator gateway" : "Mock CAMARA SIM Swap"],
-    ["Primary model", data.llm.gemini_configured ? data.llm.gemini_model : "Not configured"],
-    ["Fallback model", data.llm.meta_configured ? data.llm.meta_model : "Deterministic mock"],
+    ["Primary model", data.llm.meta_configured ? `Meta · ${data.llm.meta_model}` : data.llm.grok_configured ? `Grok · ${data.llm.grok_model}` : "Not configured"],
+    ["Fallback model", data.llm.meta_configured && data.llm.grok_configured ? `Grok · ${data.llm.grok_model}` : "Deterministic mock"],
     ["Engine now", data.llm.primary],
     ["SMS", data.sms === "textlk" ? "Text.lk" : "Log only, no link and no code"],
     ["Email", data.email === "smtp" ? "SMTP" : "Log only"],
