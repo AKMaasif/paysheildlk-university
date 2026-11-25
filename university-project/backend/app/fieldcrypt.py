@@ -1,7 +1,7 @@
 """Start-up checks for the encrypted personal fields."""
 import sqlalchemy as sa
 
-from app.crypto import WeakKeyError, open_field, seal_field
+from app.crypto import WeakKeyError, encrypt, open_field, seal_field
 
 FIELDS = {"email": "email", "phone": "phone", "nic": "nic", "account_number": "account"}
 USERS = sa.table("users", sa.column("id"), *[sa.column(name) for name in FIELDS])
@@ -21,6 +21,11 @@ def check_key_matches_data(engine, secret: str) -> None:
                 return
 
 
+SIM = sa.table("sim_events", sa.column("id"), sa.column("phone"))
+NOTES = sa.table("notifications", sa.column("id"), sa.column("body"))
+REPORTS = sa.table("reports", sa.column("id"), sa.column("markdown"))
+
+
 def encrypt_plain_fields(engine, secret: str) -> int:
     """Encrypt any personal field still stored as plain text (a restored older backup, a row inserted by hand).
     Returns how many rows were changed. Safe to run on every start."""
@@ -31,5 +36,13 @@ def encrypt_plain_fields(engine, secret: str) -> int:
             values = {c: seal_field(str(row[c]), secret, p) for c, p in FIELDS.items() if row[c] is not None and not str(row[c]).startswith("siv1$")}
             if values:
                 connection.execute(sa.update(USERS).where(USERS.c.id == row["id"]).values(**values))
+                changed += 1
+        # Telecom event numbers, notification text and report text. Only rows not yet encrypted are read.
+        for row in connection.execute(sa.select(SIM.c.id, SIM.c.phone).where(SIM.c.phone.notlike("siv1$%"))).all():
+            connection.execute(sa.update(SIM).where(SIM.c.id == row.id).values(phone=seal_field(str(row.phone), secret, "phone")))
+            changed += 1
+        for table, column, purpose in ((NOTES, "body", "notification"), (REPORTS, "markdown", "report")):
+            for row in connection.execute(sa.select(table.c.id, table.c[column]).where(table.c[column].notlike("gcm2$%"))).all():
+                connection.execute(sa.update(table).where(table.c.id == row.id).values({column: encrypt(str(row[1]), secret, purpose)}))
                 changed += 1
     return changed
