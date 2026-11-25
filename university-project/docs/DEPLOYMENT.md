@@ -43,6 +43,7 @@ Set `APP_ENV=production`. The backend then **refuses to start** unless all of th
 | --- | --- |
 | `JWT_SECRET`, `ENCRYPTION_KEY`, `HMAC_KEY`, `ANSWER_PEPPER` | Each set, at least 32 characters, not the development value. Make them with `openssl rand -hex 32` |
 | `DEMO_ASSIST` | `false` (it exposes live authenticator codes) |
+| `COOKIE_SECURE` | Browser sessions are HttpOnly, SameSite=Strict cookies. In production they are also `Secure` (HTTPS only) unless this is set to `false`. The site and the API must share a host name, because the live stream sends the cookie to the API directly |
 | `ALLOWED_ORIGINS` | The real site address(es), each starting `https://`, comma separated. Never `*` |
 | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | Needed on the very first start only (section 5) |
 
@@ -55,7 +56,7 @@ Other settings:
 | `CHECKPOINTER` | `auto` | `auto` uses Postgres when the database is Postgres, otherwise SQLite. If Postgres cannot be reached it falls back to a SQLite file and logs an error |
 | `FACE_ENGINE` | `dlib` | `legacy` is a two-frame test heuristic. Never use it with real customers |
 | `FACE_CHALLENGE` | `true` | The random look-left, blink, smile challenge. Keep on |
-| `GEMINI_API_KEY`, `META_API_KEY` | empty | Optional. Without them the deterministic engine writes the notes. No decision depends on a model |
+| `META_API_KEY`, `XAI_API_KEY` | empty | Optional. Without them the deterministic engine writes the notes. No decision depends on a model |
 | `TEXTLK_API_KEY`, `TEXTLK_API_URL`, `SMS_SENDER_ID` | empty | SMS. Empty means messages are logged, not sent |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | empty | Email. Empty means logged, not sent |
 | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | empty | Push. All three are required |
@@ -151,5 +152,5 @@ that allows the site's own scripts and the OpenStreetMap tile server the Map pag
 ## 10. What a deployment still lacks
 
 * More than one backend process (section 3).
-* A rotation tool for `ENCRYPTION_KEY`. Rotating it today makes stored face templates, authenticator secrets and the encrypted personal fields (email, phone, NIC, account number) unreadable; the service refuses to start on a key that does not match the stored data.
+* Changing `ENCRYPTION_KEY` is done with the rotation tool, never by editing the setting alone: a key that does not match the stored data stops the service at start. Stop the service, take a database backup, then run `OLD_ENCRYPTION_KEY=... NEW_ENCRYPTION_KEY=... DATABASE_URL=... python -m app.rekey --dry-run` (and again without `--dry-run`). It re-encrypts the personal fields, authenticator secrets, face data, telecom event numbers, notification text and report text in one transaction, checks each value reads back, and changes nothing if any value cannot be read. Then start the service with the new key.
 * Real SIM-swap data, a real bank ledger, and a legal review of the face-data handling. See `docs/TEST_REPORT.md`, section 6.
