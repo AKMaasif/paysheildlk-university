@@ -260,7 +260,7 @@ def _brief(facts: str, findings: list[str]) -> tuple[str, str]:
     from app.runtime import runtime
 
     settings = runtime.settings
-    if settings is not None and (settings.gemini_api_key or settings.meta_api_key):
+    if settings is not None and (settings.meta_api_key or settings.xai_api_key):
         try:
             enforce("analytics", "write_brief")
             result = runtime.llm.complete(system=BRIEF_SYSTEM, user=facts, purpose="analytics")
