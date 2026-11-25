@@ -100,7 +100,7 @@ def test_risk_factors_show_their_sign_and_points():
 
 
 def test_the_model_line_names_the_providers_or_says_none_was_used():
-    assert "Language model calls on this case: gemini 2, mock 1." in render_report(case(provider_counts={"mock": 1, "gemini": 2}), person(), None, [])
+    assert "Language model calls on this case: meta 2, mock 1." in render_report(case(provider_counts={"mock": 1, "meta": 2}), person(), None, [])
     assert "No model call on this case" in render_report(case(provider_counts={}), person(), None, [])
 
 
