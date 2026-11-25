@@ -43,8 +43,9 @@ class Settings:
     database_url: str
     redis_url: str
     jwt_secret: str
-    gemini_api_key: str
-    gemini_model: str
+    xai_api_key: str
+    xai_base_url: str
+    xai_model: str
     meta_api_key: str
     meta_base_url: str
     meta_model: str
@@ -83,6 +84,7 @@ class Settings:
     demo_allowed_phones: tuple[str, ...]
     demo_allowed_emails: tuple[str, ...]
     trusted_proxies: tuple[str, ...]
+    cookie_secure: bool
     notify_max_per_hour: int
     notify_max_attempts: int
     encryption_key: str
@@ -98,13 +100,13 @@ class Settings:
         # What the mode switches off. The credentials are read, then ignored, and the names of what was ignored are kept
         # so the presenter can see that, say, SMS credentials are present but not in use.
         textlk, smtp, fcm_project = _get("TEXTLK_API_KEY"), _get("SMTP_HOST"), _get("FIREBASE_PROJECT_ID")
-        gemini, meta, telco = _get("GEMINI_API_KEY"), _get("META_API_KEY"), _get("TELCO_BASE_URL").rstrip("/")
+        grok, meta, telco = _get("XAI_API_KEY"), _get("META_API_KEY"), _get("TELCO_BASE_URL").rstrip("/")
         ignored: list[str] = []
         if mode == "deterministic":
-            for name, value in (("SMS (Text.lk)", textlk), ("email (SMTP)", smtp), ("push (Firebase)", fcm_project), ("AI model (Gemini)", gemini), ("AI model (Meta)", meta), ("telecom gateway", telco)):
+            for name, value in (("SMS (Text.lk)", textlk), ("email (SMTP)", smtp), ("push (Firebase)", fcm_project), ("AI model (Meta)", meta), ("AI model (Grok)", grok), ("telecom gateway", telco)):
                 if value:
                     ignored.append(name)
-            textlk = smtp = fcm_project = gemini = meta = telco = ""
+            textlk = smtp = fcm_project = grok = meta = telco = ""
         elif mode == "hybrid" and telco:
             ignored.append("telecom gateway")
             telco = ""
@@ -112,8 +114,9 @@ class Settings:
             database_url=_get("DATABASE_URL", "sqlite:///./data/payshield.db"),
             redis_url=_get("REDIS_URL", ""),
             jwt_secret=_get("JWT_SECRET", "dev-only-change-me-payshield-pilot"),
-            gemini_api_key=gemini,
-            gemini_model=_get("GEMINI_MODEL", "gemini-2.5-flash"),
+            xai_api_key=grok,
+            xai_base_url=_get("XAI_BASE_URL", "https://api.x.ai/v1").rstrip("/"),
+            xai_model=_get("XAI_MODEL", "grok-4.20-0309-non-reasoning"),
             meta_api_key=meta,
             meta_base_url=_get("META_BASE_URL", "https://api.meta.ai/v1").rstrip("/"),
             meta_model=_get("META_MODEL", "muse-ember-1.0"),
@@ -156,6 +159,7 @@ class Settings:
             demo_allowed_phones=_list(_get("DEMO_ALLOWED_PHONES")),
             demo_allowed_emails=tuple(item.lower() for item in _list(_get("DEMO_ALLOWED_EMAILS"))),
             trusted_proxies=tuple(_list(_get("TRUSTED_PROXIES", "127.0.0.1,::1"))),
+            cookie_secure=_flag("COOKIE_SECURE", "true" if production else "false"),
             notify_max_per_hour=_int("NOTIFY_MAX_PER_HOUR", 0 if production else 20),
             notify_max_attempts=max(1, min(_int("NOTIFY_MAX_ATTEMPTS", 2), 3)),
         )
