@@ -390,19 +390,19 @@ def analytics() -> list[dict]:
 
     # A reworded brief that adds a number that is not in the facts must be dropped.
     settings, llm = runtime.settings, runtime.llm
-    orig_key, orig_complete = settings.gemini_api_key, llm.complete
+    orig_key, orig_complete = settings.meta_api_key, llm.complete
     an._brief_cache.clear()
     try:
-        settings.gemini_api_key = "x"
-        llm.complete = lambda **kw: LLMResult(text="There were 987654 abnormal payments.", provider="gemini", model="m", latency_ms=1, fell_back=False, fallback_from=None)
+        settings.meta_api_key = "x"
+        llm.complete = lambda **kw: LLMResult(text="There were 987654 abnormal payments.", provider="meta", model="m", latency_ms=1, fell_back=False, fallback_from=None)
         _text, source = an._brief("1,000 payments", ["1,000 payments"])
         dropped = int(source == "rules")
-        llm.complete = lambda **kw: LLMResult(text="There were 1,000 payments.", provider="gemini", model="m", latency_ms=1, fell_back=False, fallback_from=None)
+        llm.complete = lambda **kw: LLMResult(text="There were 1,000 payments.", provider="meta", model="m", latency_ms=1, fell_back=False, fallback_from=None)
         an._brief_cache.clear()
         _text, source = an._brief("1,000 payments", ["1,000 payments"])
-        kept = int(source == "gemini")
+        kept = int(source == "meta")
     finally:
-        settings.gemini_api_key, llm.complete = orig_key, orig_complete
+        settings.meta_api_key, llm.complete = orig_key, orig_complete
         an._brief_cache.clear()
     return [
         _check("headline total equals the sum of the daily counts", total_ok, 1, "same data summed two ways"),
