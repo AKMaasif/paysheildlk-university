@@ -6,6 +6,8 @@ from fastapi import (
     Depends,
     Header,
     HTTPException,
+    Request,
+    Response,
 )
 from pydantic import BaseModel
 
@@ -28,12 +30,13 @@ from app.routes.common import (
     _customer_steps,
     _pdf_response,
     _public_user,
-    _session_tokens,
+    finish_session,
     require_customer,
 )
 from app.runtime import runtime
 from app.security import (
     decode_token,
+    is_revoked,
     open_totp,
     seal_totp,
     totp_accept,
@@ -154,12 +157,14 @@ def _pending_or_customer(authorization: str | None) -> User:
         user = session.get(User, payload["sub"])
         if user is None or user.role != "customer":
             raise HTTPException(status_code=403, detail="Customer sign-in required")
+        if payload.get("purpose") == "access" and is_revoked(session, payload, user):
+            raise HTTPException(status_code=401, detail="Session ended")
         session.expunge(user)
         return user
 
 
 @router.post("/api/customer/totp/confirm")
-def totp_confirm(body: TotpConfirm, authorization: str | None = Header(default=None)):
+def totp_confirm(body: TotpConfirm, request: Request, response: Response, authorization: str | None = Header(default=None)):
     user = _pending_or_customer(authorization)
     with session_scope() as session:
         row = session.get(User, user.id)
@@ -171,7 +176,7 @@ def totp_confirm(body: TotpConfirm, authorization: str | None = Header(default=N
         row.totp_enrolled = True
         user_id, role = row.id, row.role
         snapshot = _public_user(row)
-    return {**_session_tokens(user_id, role), "user": snapshot}
+    return finish_session(request, response, user_id, role, snapshot)
 
 
 @router.get("/api/customer/home")
