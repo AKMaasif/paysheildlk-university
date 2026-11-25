@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthSide } from "@/components/AuthSide";
 import { AuthenticatorStep, type Session } from "@/components/AuthenticatorStep";
-import { api, setToken, setUser } from "@/lib/api";
+import { api, setUser } from "@/lib/api";
 
 export default function CustomerLogin() {
   const router = useRouter();
@@ -35,7 +35,6 @@ export default function CustomerLogin() {
   }
 
   function finish(session: Session) {
-    setToken("customer", session.token, session.refresh_token);
     setUser("customer", session.user);
     router.replace("/c/home");
   }
