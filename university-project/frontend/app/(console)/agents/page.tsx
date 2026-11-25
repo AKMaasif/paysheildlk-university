@@ -29,7 +29,7 @@ export default function AgentsPage() {
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
-    api<{ agents: Agent[]; primary: { primary: string; gemini_model: string; meta_model: string } }>("/api/agents")
+    api<{ agents: Agent[]; primary: { primary: string; meta_model: string; grok_model: string } }>("/api/agents")
       .then((body) => {
         setRows(body.agents);
         setPrimary(body.primary.primary === "mock" ? "No API key is set, so notes come from the deterministic mock." : `Primary provider: ${body.primary.primary}.`);
