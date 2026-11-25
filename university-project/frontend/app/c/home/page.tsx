@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppBar } from "@/components/CustomerChrome";
 import { FaceCapture, type Capture } from "@/components/FaceCapture";
-import { api, downloadAuthed, getToken, wsUrl } from "@/lib/api";
+import { api, downloadAuthed, isSignedIn, wsUrl } from "@/lib/api";
 
 type Prompt = {
   type?: string;
@@ -70,7 +70,7 @@ export default function CustomerHome() {
   }
 
   useEffect(() => {
-    if (!getToken("customer")) {
+    if (!isSignedIn("customer")) {
       router.replace("/c/login");
       return;
     }
