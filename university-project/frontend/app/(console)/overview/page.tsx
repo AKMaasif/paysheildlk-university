@@ -72,7 +72,7 @@ export default function OverviewPage() {
   const held = money(data?.kpis.held_lkr || 0);
   const blocked = money(data?.kpis.blocked_lkr || 0);
   const replyStat = reply(data?.kpis.avg_reply_seconds ?? null);
-  const offline = health && !health.llm.gemini_configured && !health.llm.meta_configured;
+  const offline = health && !health.llm.meta_configured && !health.llm.grok_configured;
   const chip = (data?.kpis.waiting || 0) > 0 ? "WATCH" : "PROTECTED";
 
   function choose(row: CaseRow) {
@@ -98,7 +98,7 @@ export default function OverviewPage() {
   return (
     <>
       <PageHeader crumb="Monitor / Overview" title="Sri Lanka overview" subtitle="Simulated banking network · Asia/Colombo" chip={chip} />
-      {offline && <Note>No model key found, so the agents use the offline rules engine. Add GEMINI_API_KEY or META_API_KEY and restart.</Note>}
+      {offline && <Note>No model key found, so the agents use the offline rules engine. Add META_API_KEY or XAI_API_KEY and restart.</Note>}
       {health?.sms === "log" && <Note>SMS is log-only. Messages still contain no link and no code.</Note>}
       {error && <Note>{error}</Note>}
       <FraudAnalytics />
