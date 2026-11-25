@@ -15,7 +15,7 @@ def production(tmp_path, monkeypatch):
     env = {
         "APP_ENV": "production", "DATABASE_URL": f"sqlite:///{tmp_path}/prod.db", "CHECKPOINT_PATH": str(tmp_path / "cp.sqlite"), "CHECKPOINTER": "sqlite",
         "REDIS_URL": "", "JWT_SECRET": "j" * 40, "ENCRYPTION_KEY": "e" * 40, "HMAC_KEY": "h" * 40, "ANSWER_PEPPER": "a" * 40, "DEMO_ASSIST": "false",
-        "ALLOWED_ORIGINS": "https://bank.example", "FACE_ENGINE": "legacy", "STEP_DELAY_MS": "0", "GEMINI_API_KEY": "", "META_API_KEY": "",
+        "ALLOWED_ORIGINS": "https://bank.example", "FACE_ENGINE": "legacy", "STEP_DELAY_MS": "0", "XAI_API_KEY": "", "META_API_KEY": "",
         "BOOTSTRAP_ADMIN_EMAIL": "admin@bank.example", "BOOTSTRAP_ADMIN_PASSWORD": GOOD_PASSWORD,
         "TEXTLK_API_KEY": "", "SMTP_HOST": "", "FIREBASE_PROJECT_ID": "",
     }
