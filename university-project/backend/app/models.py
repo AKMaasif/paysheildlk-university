@@ -8,6 +8,18 @@ from app.db import Base
 from app.util import utcnow
 
 
+def _encryption_secret() -> str:
+    from app.runtime import runtime
+
+    if runtime.settings is not None:
+        return runtime.settings.encryption_key
+    from app.config import (
+        Settings,  # used outside the running service, for example by a migration script
+    )
+
+    return Settings.from_env().encryption_key
+
+
 class Sensitive(TypeDecorator):
     """A personal field stored encrypted. Code reads and writes the plain value; the database holds siv1$ ciphertext.
     The same value always gives the same ciphertext, so `User.email == "x"` and similar lookups keep working: the value
@@ -22,15 +34,7 @@ class Sensitive(TypeDecorator):
         self.purpose = purpose
 
     def _secret(self) -> str:
-        from app.runtime import runtime
-
-        if runtime.settings is not None:
-            return runtime.settings.encryption_key
-        from app.config import (
-            Settings,  # used outside the running service, for example by a migration script
-        )
-
-        return Settings.from_env().encryption_key
+        return _encryption_secret()
 
     def process_bind_param(self, value, dialect):
         if value is None or str(value).startswith("siv1$"):
@@ -45,6 +49,36 @@ class Sensitive(TypeDecorator):
         from app.crypto import open_field
 
         return open_field(value, self._secret(), self.purpose)
+
+
+class SecretText(TypeDecorator):
+    """Free text stored encrypted (random nonce, so equal texts differ). It is read back whole and never searched by
+    content. Rows written before this existed are plain text and still read; the start-up check and the 0005 migration
+    encrypt them."""
+
+    impl = Text
+    cache_ok = True
+
+    def __init__(self, purpose: str):
+        super().__init__()
+        self.purpose = purpose
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        from app.crypto import encrypt
+
+        return encrypt(str(value), _encryption_secret(), self.purpose)
+
+    def process_result_value(self, value, dialect):
+        if value is None or not str(value).startswith("gcm2$"):
+            return value
+        from app.crypto import decrypt
+
+        try:
+            return decrypt(value, _encryption_secret(), self.purpose)
+        except Exception:
+            return value  # text that only looks like ciphertext
 
 
 class User(Base):
@@ -68,6 +102,8 @@ class User(Base):
     totp_enrolled: Mapped[bool] = mapped_column(Boolean, default=False)
     totp_failures: Mapped[int] = mapped_column(Integer, default=0)
     totp_locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Sessions issued before this moment are no longer valid (set by "sign out everywhere").
+    tokens_valid_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active")
     restricted: Mapped[bool] = mapped_column(Boolean, default=False)
     restricted_actions: Mapped[list | None] = mapped_column(JSON, nullable=True)
@@ -102,7 +138,7 @@ class SimEvent(Base):
     __tablename__ = "sim_events"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    phone: Mapped[str] = mapped_column(String(20), index=True)
+    phone: Mapped[str] = mapped_column(Sensitive("phone", 160), index=True)  # same field name as users.phone, so equal numbers match
     event_type: Mapped[str] = mapped_column(String(40), index=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     detail: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -218,9 +254,21 @@ class Report(Base):
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
     case_id: Mapped[str] = mapped_column(String(40), index=True)
     title: Mapped[str] = mapped_column(String(300))
-    markdown: Mapped[str] = mapped_column(Text)
+    markdown: Mapped[str] = mapped_column(SecretText("report"))
     sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class RevokedToken(Base):
+    """A session token that was signed out. Tokens are stateless, so signing out records the one that was in use and every
+    check refuses it until it would have expired anyway; the row can then be deleted."""
+
+    __tablename__ = "revoked_tokens"
+
+    jti: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(40), index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class AuditLog(Base):
@@ -280,7 +328,7 @@ class Notification(Base):
     case_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
     channel: Mapped[str] = mapped_column(String(20))
     title: Mapped[str] = mapped_column(String(200))
-    body: Mapped[str] = mapped_column(Text)
+    body: Mapped[str] = mapped_column(SecretText("notification"))
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
