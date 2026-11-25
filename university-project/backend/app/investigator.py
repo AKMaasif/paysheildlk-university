@@ -99,7 +99,7 @@ def _model_next(agent: str, seen: dict, used: list[str]) -> Choice | None:
     from app.runtime import runtime
 
     s = runtime.settings
-    if not (s.gemini_api_key or s.meta_api_key):
+    if not (s.meta_api_key or s.xai_api_key):
         return None
     menu = {t: d for t, d in EXTRA[agent].items() if t not in used}
     if not menu:
