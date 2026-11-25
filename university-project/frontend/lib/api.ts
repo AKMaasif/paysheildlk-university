@@ -2,40 +2,37 @@ export type Portal = "operator" | "customer";
 
 const KEYS = { operator: "payshield_operator", customer: "payshield_customer" };
 
-export function getToken(portal: Portal = "operator"): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem(KEYS[portal]) || "";
+// The session itself lives in HttpOnly cookies that page scripts cannot read: the server sets them when the person signs
+// in and the browser sends them with every request. What is kept here is only the person's public details (name, role),
+// used to draw the page and to know whether to show the sign-in screen. It is not a credential.
+export function isSignedIn(portal: Portal = "operator"): boolean {
+  if (typeof window === "undefined") return false;
+  return !!localStorage.getItem(userKey(portal));
 }
 
-export function setToken(portal: Portal, token: string, refresh?: string) {
-  localStorage.setItem(KEYS[portal], token);
-  if (refresh) localStorage.setItem(KEYS[portal] + "_refresh", refresh);
+/** Forget the person's details here and clear the session cookies on the server. */
+export async function clearSession(portal: Portal): Promise<void> {
+  localStorage.removeItem(userKey(portal));
+  try {
+    await fetch("/backend/api/auth/logout", { method: "POST", headers: SITE_HEADERS, body: JSON.stringify({ portal }) });
+  } catch {
+    /* the cookies expire on their own */
+  }
 }
 
-export function clearToken(portal: Portal) {
-  localStorage.removeItem(KEYS[portal]);
-  localStorage.removeItem(KEYS[portal] + "_refresh");
-}
+// Sent on every request. The first asks the server for cookie sessions at sign-in; the second proves a state-changing
+// request comes from this site and not another page (a page on another site cannot add it without our permission).
+const SITE_HEADERS = { "X-Session-Mode": "cookie", "X-Requested-With": "payshield", "Content-Type": "application/json" };
 
-// Access tokens last 30 minutes. One shared refresh call per portal renews them.
+// The access cookie lasts 30 minutes. One shared refresh call per portal renews it from the refresh cookie.
 const refreshing: Partial<Record<Portal, Promise<boolean>>> = {};
 
 async function renewAccess(portal: Portal): Promise<boolean> {
-  const refresh = localStorage.getItem(KEYS[portal] + "_refresh");
-  if (!refresh) return false;
   if (!refreshing[portal]) {
     refreshing[portal] = (async () => {
       try {
-        const response = await fetch("/backend/api/auth/refresh", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: refresh }),
-        });
-        if (!response.ok) return false;
-        const body = (await response.json()) as { token?: string };
-        if (!body.token) return false;
-        localStorage.setItem(KEYS[portal], body.token);
-        return true;
+        const response = await fetch("/backend/api/auth/refresh", { method: "POST", headers: SITE_HEADERS, body: JSON.stringify({ portal }) });
+        return response.ok;
       } catch {
         return false;
       } finally {
@@ -85,18 +82,15 @@ export async function api<T = unknown>(
   if (!(options.body instanceof FormData) && options.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
+  headers.set("X-Session-Mode", "cookie");
+  headers.set("X-Requested-With", "payshield");
   const explicitAuth = headers.has("Authorization");
-  const token = getToken(portal);
-  if (token && !explicitAuth) headers.set("Authorization", `Bearer ${token}`);
   let response = await fetch(`/backend${path}`, { ...options, headers });
   if (response.status === 401 && typeof window !== "undefined" && !explicitAuth && !credentialCheck(path)) {
-    if (await renewAccess(portal)) {
-      headers.set("Authorization", `Bearer ${getToken(portal)}`);
-      response = await fetch(`/backend${path}`, { ...options, headers });
-    }
+    if (await renewAccess(portal)) response = await fetch(`/backend${path}`, { ...options, headers });
   }
   if (response.status === 401 && typeof window !== "undefined" && !credentialCheck(path)) {
-    clearToken(portal);
+    localStorage.removeItem(userKey(portal));
     const target = portal === "customer" ? "/c/login" : "/signin";
     if (!window.location.pathname.startsWith(target)) window.location.href = target;
   }
@@ -130,11 +124,12 @@ export async function downloadAuthed(path: string, filename: string, portal: Por
   URL.revokeObjectURL(url);
 }
 
+// The live stream signs in with the same cookie (the browser sends it with the connection). The server only accepts the
+// cookie from a page of this site, and `portal` says which of the two sessions this connection is for.
 export function wsUrl(portal: Portal = "operator"): string {
-  const token = getToken(portal);
   const explicit = process.env.NEXT_PUBLIC_WS_URL;
-  if (explicit) return `${explicit}${explicit.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`;
+  if (explicit) return `${explicit}${explicit.includes("?") ? "&" : "?"}portal=${portal}`;
   const proto = window.location.protocol === "https:" ? "wss" : "ws";
   const port = process.env.NEXT_PUBLIC_WS_PORT || "8000";
-  return `${proto}://${window.location.hostname}:${port}/ws?token=${encodeURIComponent(token)}`;
+  return `${proto}://${window.location.hostname}:${port}/ws?portal=${portal}`;
 }
