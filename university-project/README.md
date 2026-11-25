@@ -35,7 +35,7 @@ flowchart TD
 
 The supervisor graph is LangGraph. Routing is explicit. While the customer is answering, the graph is paused with `interrupt()` and a Postgres checkpointer (SQLite if Postgres is not the app database). Resume continues the same case.
 
-After a customer says the payment was theirs, the desk asks for a live camera selfie and then up to four rounds of three knowledge questions. A second fake selfie, or a fourth failed round, blocks the payment. Customers sign in with their username and password and then a 6-digit code from an authenticator app; the password alone never opens a session. Security answers are Argon2id hashes with one shared clean-up (each customer has eight questions and a round draws three). The authenticator secret and face data are encrypted with AES-256-GCM, and email, phone, NIC and account number are stored encrypted (AES-256-GCM-SIV, so lookups still work); every key is derived from `ENCRYPTION_KEY`, which must be at least 32 characters, and a wrong key stops the service at start. Agent handoffs can be checked with `HMAC_KEY`. `TEXTLK_API_KEY` and `SMTP_*` turn on the real SMS and email drivers; empty values stay on the log driver.
+After a customer says the payment was theirs, the desk asks for a live camera selfie and then up to four rounds of three knowledge questions. A second fake selfie, or a fourth failed round, blocks the payment. Customers sign in with their username and password and then a 6-digit code from an authenticator app; the password alone never opens a session. In a browser the session lives in HttpOnly, SameSite=Strict cookies that page scripts cannot read (`COOKIE_SECURE` adds the Secure flag in production). Signing out revokes the tokens, so a copy taken earlier stops working at once. Security answers are Argon2id hashes with one shared clean-up (each customer has eight questions and a round draws three). The authenticator secret and face data are encrypted with AES-256-GCM, and email, phone, NIC and account number are stored encrypted (AES-256-GCM-SIV, so lookups still work); every key is derived from `ENCRYPTION_KEY`, which must be at least 32 characters, and a wrong key stops the service at start. Agent handoffs can be checked with `HMAC_KEY`. `TEXTLK_API_KEY` and `SMTP_*` turn on the real SMS and email drivers; empty values stay on the log driver.
 
 | Piece | Role |
 | --- | --- |
@@ -57,7 +57,7 @@ Open the operator console at http://localhost:3000 and the customer site at http
 
 API docs: http://localhost:8000/docs.
 
-With no keys set, every model call uses the deterministic mock. Gemini is primary when `GEMINI_API_KEY` is set (`gemini-2.5-flash` by default). On rate limit, timeout, or other errors it falls back to the Meta Model API (`META_API_KEY`, base `https://api.meta.ai/v1`, model `muse-ember-1.0`). Each call records which provider answered. If both fail, the mock still answers so the desk does not stop.
+With no keys set, every model call uses the deterministic mock. Meta is the main model when `META_API_KEY` is set (`META_MODEL`, default `muse-ember-1.0`; `META_BASE_URL`). If Meta fails (rate limit, timeout, any error), the call goes to Grok (xAI) when `XAI_API_KEY` is set (`XAI_MODEL`, default `grok-4.20-0309-non-reasoning`; `XAI_BASE_URL`, default `https://api.x.ai/v1`). If both fail, or neither is set, the deterministic mock writes the note, so a case never waits on a model. Both providers use the OpenAI-style chat-completions format. Model names change over time: check yours against your Meta account and the xAI models page.
 
 Leave `TEXTLK_API_KEY`, `SMTP_*`, and `FIREBASE_*` empty to log SMS and email and to keep push on the in-app channel.
 
@@ -246,7 +246,7 @@ backend/app/routes/            HTTP routes by area (auth, console, customer, adm
 backend/app/api.py             assembles the route modules into one router
 backend/app/risk.py            score and the hold / block / release rules
 backend/app/facts.py           CAMARA-shaped SIM swap reads
-backend/app/llm.py             Gemini, Meta, mock
+backend/app/llm.py             Meta, Grok (xAI), mock
 frontend/app/(console)         operator desk
 frontend/app/c                 customer site (landing, register, log in, account, password)
 ```
