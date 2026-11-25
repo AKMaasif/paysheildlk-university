@@ -14,7 +14,7 @@ from app.demo import trigger
 from app.models import Case, CaseEvent, Notification
 from app.runtime import runtime
 
-CREDENTIALS = {"TEXTLK_API_KEY": "sms-key", "SMTP_HOST": "smtp.example", "GEMINI_API_KEY": "gem-key", "META_API_KEY": "meta-key", "TELCO_BASE_URL": "https://operator.example/camara", "FIREBASE_PROJECT_ID": "proj"}
+CREDENTIALS = {"TEXTLK_API_KEY": "sms-key", "SMTP_HOST": "smtp.example", "XAI_API_KEY": "grok-key", "META_API_KEY": "meta-key", "TELCO_BASE_URL": "https://operator.example/camara", "FIREBASE_PROJECT_ID": "proj"}
 
 
 @pytest.fixture(autouse=True)
@@ -41,13 +41,13 @@ def settings_for(monkeypatch, mode=None, **extra):
 def test_the_default_mode_ignores_every_external_credential_and_says_which(monkeypatch):
     s = settings_for(monkeypatch)
     assert s.demo_mode == "deterministic"
-    assert (s.sms_driver, s.email_driver, s.push_driver, s.telco_base_url, s.gemini_api_key, s.meta_api_key) == ("log", "log", "websocket", "", "", "")
-    assert set(s.ignored_by_mode) == {"SMS (Text.lk)", "email (SMTP)", "push (Firebase)", "AI model (Gemini)", "AI model (Meta)", "telecom gateway"}
+    assert (s.sms_driver, s.email_driver, s.push_driver, s.telco_base_url, s.xai_api_key, s.meta_api_key) == ("log", "log", "websocket", "", "", "")
+    assert set(s.ignored_by_mode) == {"SMS (Text.lk)", "email (SMTP)", "push (Firebase)", "AI model (Meta)", "AI model (Grok)", "telecom gateway"}
 
 
 def test_hybrid_uses_real_messaging_and_models_but_never_the_telecom_gateway(monkeypatch):
     s = settings_for(monkeypatch, "hybrid")
-    assert (s.sms_driver, s.email_driver, s.gemini_api_key, s.telco_base_url) == ("textlk", "smtp", "gem-key", "")
+    assert (s.sms_driver, s.email_driver, s.xai_api_key, s.telco_base_url) == ("textlk", "smtp", "grok-key", "")
     assert s.ignored_by_mode == ("telecom gateway",)
 
 
