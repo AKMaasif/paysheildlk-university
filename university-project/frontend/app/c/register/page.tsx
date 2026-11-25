@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { AuthSide } from "@/components/AuthSide";
 import { FaceCapture, type Capture, type Challenge } from "@/components/FaceCapture";
 import { AuthenticatorStep, type Session } from "@/components/AuthenticatorStep";
-import { api, setToken, setUser } from "@/lib/api";
+import { api, setUser } from "@/lib/api";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -102,7 +102,6 @@ export default function Register() {
   }
 
   function finish(session: Session) {
-    setToken("customer", session.token, session.refresh_token);
     setUser("customer", session.user);
     router.replace("/c/home");
   }
