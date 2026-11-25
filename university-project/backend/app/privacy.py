@@ -1,7 +1,7 @@
 """What may leave the bank for a hosted model.
 
-Agents write their facts in plain text. Before any of it reaches Gemini or the
-fallback model, personal identifiers are masked here, and text that carries a
+Agents write their facts in plain text. Before any of it reaches Meta or the
+Grok fallback, personal identifiers are masked here, and text that carries a
 secret (a password, a security answer, an authenticator code) is refused
 outright. The mock engine gets the same masked text, so tests see what a real
 provider would see.
