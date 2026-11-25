@@ -101,7 +101,7 @@ One component that reads every feed, holds every tool and decides alone, using t
 
 Same decision as the multi-agent graph: 192 of 192. Accuracy is the same because the decision comes from the same rules. The multi-agent graph is slower: it signs every handoff, writes events and keeps a record. That cost buys the separation below, not accuracy.
 
-Model-only single agent: **not run.** No GEMINI_API_KEY or META_API_KEY is set. The mock model has no judgement, so a result from it would be invented.
+Model-only single agent: **not run.** No META_API_KEY or XAI_API_KEY is set. The mock model has no judgement, so a result from it would be invented.
 
 
 ### What each part can reach
