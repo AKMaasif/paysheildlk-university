@@ -193,11 +193,12 @@ def init_runtime() -> None:
     runtime.engine = engine
     runtime.bus = EventBus()
     runtime.llm = LLMRouter(
-        gemini_api_key=settings.gemini_api_key,
-        gemini_model=settings.gemini_model,
         meta_api_key=settings.meta_api_key,
         meta_base_url=settings.meta_base_url,
         meta_model=settings.meta_model,
+        xai_api_key=settings.xai_api_key,
+        xai_base_url=settings.xai_base_url,
+        xai_model=settings.xai_model,
     )
     runtime.redis = _connect_redis(settings)
     manager, saver, kind = _open_checkpointer(settings)
@@ -228,5 +229,5 @@ def init_runtime() -> None:
         "postgres" if settings.database_url.startswith("postgres") else "sqlite",
         kind,
         "yes" if runtime.redis is not None else "memory",
-        "gemini" if settings.gemini_api_key else ("meta" if settings.meta_api_key else "mock"),
+        "meta" if settings.meta_api_key else ("grok" if settings.xai_api_key else "mock"),
     )
