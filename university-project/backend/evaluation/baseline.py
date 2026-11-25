@@ -64,7 +64,7 @@ def model_available() -> bool:
     from app.runtime import runtime
 
     s = runtime.settings
-    return bool(s.gemini_api_key or s.meta_api_key)
+    return bool(s.meta_api_key or s.xai_api_key)
 
 
 def model_single(sc: Scenario) -> dict:
