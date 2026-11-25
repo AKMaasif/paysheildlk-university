@@ -27,7 +27,7 @@
 ## Functionality
 
 - **Agents:** supervisor, telecom, banking, risk, policy, alert, verification, response, report and analytics. Each has a written charter that is enforced in code.
-- **Model use:** Gemini first, Meta model as fallback, a deterministic mock when no keys are set. Policy never depends on a model.
+- **Model use:** Meta first, Grok (xAI) as fallback, a deterministic mock when no keys are set. Policy never depends on a model.
 - **Step-up checks:** selfie and answer grading happen on the server. A client cannot claim a pass.
 - **Roles:** analyst, telco, bank supervisor (scoped to one bank), auditor (read-only), super admin.
 
