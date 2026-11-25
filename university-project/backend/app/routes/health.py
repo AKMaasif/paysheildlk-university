@@ -20,10 +20,10 @@ def _db_label() -> str:
 def health():
     settings = runtime.settings
     primary = "mock"
-    if settings and settings.gemini_api_key:
-        primary = "gemini"
-    elif settings and settings.meta_api_key:
+    if settings and settings.meta_api_key:
         primary = "meta"
+    elif settings and settings.xai_api_key:
+        primary = "grok"
     return {
         "ok": True,
         "service": "payshield",
@@ -32,11 +32,11 @@ def health():
         "redis": "connected" if runtime.redis is not None else "memory",
         "llm": {
             "primary": primary,
-            "gemini_configured": bool(settings and settings.gemini_api_key),
             "meta_configured": bool(settings and settings.meta_api_key),
-            "gemini_model": settings.gemini_model if settings else "",
+            "grok_configured": bool(settings and settings.xai_api_key),
             "meta_model": settings.meta_model if settings else "",
-            "fallback": "meta" if settings and settings.meta_api_key else "mock",
+            "grok_model": settings.xai_model if settings else "",
+            "fallback": "grok" if settings and settings.meta_api_key and settings.xai_api_key else "mock",
         },
         "sms": settings.sms_driver if settings else "log",
         "telco": "operator gateway" if settings and settings.telco_base_url else "simulated CAMARA",
