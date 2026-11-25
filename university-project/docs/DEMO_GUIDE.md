@@ -24,7 +24,7 @@ Everything comes from environment variables (see `.env.example`). Nothing is rea
 | Real SMS | `DEMO_MODE=hybrid`, `TEXTLK_API_KEY`, `DEMO_ALLOWED_PHONES=<your number>`. The test customer's registered mobile must be that number. |
 | Real email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `DEMO_ALLOWED_EMAILS=<your address>`; the customer's email must be that address |
 | Web push | `FIREBASE_*` on the backend and `NEXT_PUBLIC_FIREBASE_*` on the site, and a browser that granted permission |
-| Models | `GEMINI_API_KEY` and/or `META_API_KEY` |
+| Models | `META_API_KEY` (main) and/or `XAI_API_KEY` (Grok, the fallback) |
 | Operator gateway | `DEMO_MODE=external`, `TELCO_BASE_URL` |
 | Real-time timers | defaults: reminder at 180 s, escalation at 600 s (`REALERT_SECONDS`, `ESCALATE_SECONDS`) |
 
@@ -71,7 +71,7 @@ Concurrency: the former global graph lock serialised unrelated cases. Per-case l
 | Real SMS reaches a phone | No Text.lk key or test number in this environment |
 | Real email reaches an inbox | No SMTP credentials |
 | Web push reaches a browser | No Firebase project |
-| Live Gemini / Meta behaviour and fallback between them | No model keys. Fallback logic is tested with simulated failures only. |
+| Live Meta / Grok behaviour and fallback between them | No model keys. Fallback logic is tested with simulated failures only. |
 | Operator gateway (`external` mode) against a real service | No `TELCO_BASE_URL`. It is tested against a stand-in HTTP function. |
 | Delivery receipts ("DELIVERED") | No provider callback is integrated, so that state is never produced today |
 | Browser e2e, Postgres/Redis suites on this phase's changes | Not re-run in this session. CI runs them. |
