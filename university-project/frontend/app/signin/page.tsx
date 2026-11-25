@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Icons";
-import { api, setToken, setUser } from "@/lib/api";
+import { api, setUser } from "@/lib/api";
 
 type Tab = "sign-in" | "request" | "activate";
 
@@ -36,11 +36,10 @@ export default function SignInPage() {
     event.preventDefault();
     setError("");
     try {
-      const body = await api<{ token: string; refresh_token?: string; user: unknown }>("/api/auth/login", {
+      const body = await api<{ user: unknown }>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password, portal: "operator" }),
       });
-      setToken("operator", body.token, body.refresh_token);
       setUser("operator", body.user);
       router.replace("/overview");
     } catch (err) {
