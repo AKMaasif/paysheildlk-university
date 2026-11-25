@@ -125,34 +125,34 @@ class Scripted:
         return item
 
 
-GEMINI_OK = {"candidates": [{"content": {"parts": [{"text": "gemini says hi"}]}}]}
 META_OK = {"choices": [{"message": {"content": "meta says hi"}}]}
+GROK_OK = {"choices": [{"message": {"content": "grok says hi"}}]}
 
 
-def _router(transport, gemini="g", meta=""):
-    return LLMRouter(gemini_api_key=gemini, meta_api_key=meta, transport=transport)
+def _router(transport, meta="m", grok=""):
+    return LLMRouter(meta_api_key=meta, xai_api_key=grok, transport=transport)
 
 
-def test_gemini_answers_first_and_thought_parts_are_ignored():
-    transport = Scripted({"candidates": [{"content": {"parts": [{"text": "hidden", "thought": True}, {"text": "shown"}]}}]})
-    result = _router(transport).complete(system="s", user="u", purpose="risk")
-    assert (result.provider, result.text, result.fell_back) == ("gemini", "shown", False)
+def test_meta_answers_first_and_grok_is_not_asked():
+    transport = Scripted(META_OK)
+    result = _router(transport, grok="x").complete(system="s", user="u", purpose="risk")
+    assert (result.provider, result.text, result.fell_back) == ("meta", "meta says hi", False) and len(transport.calls) == 1
 
 
-@pytest.mark.parametrize("bad", [{"candidates": []}, {"candidates": [{"content": {"parts": [{"text": "  "}]}}]}, {}])
-def test_an_empty_gemini_answer_falls_back_to_meta(bad):
-    result = _router(Scripted(bad, META_OK), meta="m").complete(system="s", user="u", purpose="risk")
-    assert (result.provider, result.fell_back, result.fallback_from) == ("meta", True, "gemini")
+@pytest.mark.parametrize("bad", [{"choices": []}, {"choices": [{"message": {"content": "  "}}]}, {}])
+def test_an_empty_meta_answer_falls_back_to_grok(bad):
+    result = _router(Scripted(bad, GROK_OK), grok="x").complete(system="s", user="u", purpose="risk")
+    assert (result.provider, result.fell_back, result.fallback_from) == ("grok", True, "meta")
 
 
 def test_if_both_fail_the_mock_answers_and_says_it_fell_back():
-    result = _router(Scripted(LLMError("http", "x"), LLMError("http", "y")), meta="m").complete(system="s", user="u", purpose="telecom")
-    assert (result.provider, result.fell_back, result.fallback_from) == ("mock", True, "gemini")
+    result = _router(Scripted(LLMError("http", "x"), LLMError("http", "y")), grok="x").complete(system="s", user="u", purpose="telecom")
+    assert (result.provider, result.fell_back, result.fallback_from) == ("mock", True, "meta")
 
 
-def test_with_no_gemini_key_meta_is_the_first_choice_and_with_no_keys_the_mock():
-    result = LLMRouter(meta_api_key="m", transport=Scripted(META_OK)).complete(system="s", user="u", purpose="risk")
-    assert result.provider == "meta"
+def test_with_no_meta_key_grok_is_the_first_choice_and_with_no_keys_the_mock():
+    result = LLMRouter(xai_api_key="x", transport=Scripted(GROK_OK)).complete(system="s", user="u", purpose="risk")
+    assert result.provider == "grok"
     assert LLMRouter().complete(system="s", user="u", purpose="risk").provider == "mock"
 
 
@@ -193,7 +193,7 @@ def test_timeouts_and_connection_errors_become_model_errors(monkeypatch):
 def test_a_model_never_sees_a_secret_or_a_raw_identifier():
     from app.privacy import PrivacyViolation
 
-    seen = Scripted(GEMINI_OK)
+    seen = Scripted(META_OK)
     router = _router(seen)
     with pytest.raises(PrivacyViolation):
         router.complete(system="s", user="the customer's password: hunter2", purpose="risk")
