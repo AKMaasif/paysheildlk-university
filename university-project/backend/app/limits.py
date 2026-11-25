@@ -32,17 +32,40 @@ class BodyLimit:
         if declared.isdigit() and int(declared) > self.limit:
             return await self._refuse(send)
         seen = 0
+        started = False
+        too_big = False
 
         async def counted():
-            nonlocal seen
+            nonlocal seen, too_big
             message = await receive()
             if message["type"] == "http.request":
                 seen += len(message.get("body", b""))
                 if seen > self.limit:
+                    too_big = True
                     return {"type": "http.disconnect"}  # stop reading; the handler never sees the rest
             return message
 
-        return await self.app(scope, counted, send)
+        async def watching(message):
+            nonlocal started
+            if too_big:
+                # We cut the body off, so whatever the handler says next (usually "bad request") is replaced by the real
+                # reason. Anything else it tries to send afterwards is dropped.
+                if not started:
+                    started = True
+                    await self._refuse(send)
+                return
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, counted, watching)
+        except Exception:
+            if not (too_big and not started):
+                raise  # a real failure: not ours to hide
+        if too_big and not started:
+            # the handler gave up (or returned quietly) after we cut the body off: tell the client why
+            await self._refuse(send)
 
     @staticmethod
     async def _refuse(send):
