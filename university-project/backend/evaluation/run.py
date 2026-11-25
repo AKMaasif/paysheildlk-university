@@ -64,7 +64,7 @@ def run(per_archetype: int, seed: int, injection_scenarios: bool = True) -> dict
             "overall": metrics.confusion(base_rows),
             "latency_s": {"p50": metrics.percentile([r["latency_s"] for r in base_rows], 50), "p95": metrics.percentile([r["latency_s"] for r in base_rows], 95)},
         },
-        "model_single_agent": {"ran": False, "reason": "No GEMINI_API_KEY or META_API_KEY is set. The mock model has no judgement, so a result from it would be invented."},
+        "model_single_agent": {"ran": False, "reason": "No META_API_KEY or XAI_API_KEY is set. The mock model has no judgement, so a result from it would be invented."},
         "reach": baseline.reach(),
     }
     if baseline.model_available():
