@@ -29,7 +29,7 @@ def server(tmp_path_factory):
     port = _free_port()
     env = {**os.environ, "DATABASE_URL": database or f"sqlite:///{folder}/app.db", "CHECKPOINT_PATH": str(folder / "cp.sqlite"), "CHECKPOINTER": "postgres" if database else "sqlite",
            "REDIS_URL": redis_url or "", "JWT_SECRET": "test-secret-not-for-production-use", "STEP_DELAY_MS": "0", "FACE_ENGINE": "legacy", "DEMO_ASSIST": "true",
-           "GEMINI_API_KEY": "", "META_API_KEY": "", "TEXTLK_API_KEY": "", "SMTP_HOST": "", "FIREBASE_PROJECT_ID": ""}
+           "XAI_API_KEY": "", "META_API_KEY": "", "TEXTLK_API_KEY": "", "SMTP_HOST": "", "FIREBASE_PROJECT_ID": ""}
     log = open(folder / "server.log", "w")
     proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:app", "--port", str(port), "--log-level", "warning"], cwd=BACKEND, env=env, stdout=log, stderr=log)
     base = f"http://127.0.0.1:{port}"
