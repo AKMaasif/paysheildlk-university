@@ -261,7 +261,7 @@ def test_a_real_server_never_writes_the_live_stream_token_to_its_log(tmp_path, f
         port = s.getsockname()[1]
     log_file = tmp_path / "server.log"
     env = {**os.environ, "DATABASE_URL": f"sqlite:///{tmp_path}/a.db", "CHECKPOINT_PATH": str(tmp_path / "c.sqlite"), "CHECKPOINTER": "sqlite", "REDIS_URL": "",
-           "JWT_SECRET": "test-secret-not-for-production-use", "FACE_ENGINE": "legacy", "STEP_DELAY_MS": "0", "LOG_FORMAT": fmt, "GEMINI_API_KEY": "", "META_API_KEY": ""}
+           "JWT_SECRET": "test-secret-not-for-production-use", "FACE_ENGINE": "legacy", "STEP_DELAY_MS": "0", "LOG_FORMAT": fmt, "XAI_API_KEY": "", "META_API_KEY": ""}
     with open(log_file, "w") as sink:
         proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:app", "--port", str(port)], cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))), env=env, stdout=sink, stderr=sink)
         try:
