@@ -28,8 +28,10 @@ async function proxy(req: Request, context: { params: Promise<{ path: string[] }
   const response = await fetch(url, init);
   const out = new Headers();
   response.headers.forEach((value, key) => {
-    if (!HOP.has(key.toLowerCase())) out.set(key, value);
+    if (!HOP.has(key.toLowerCase()) && key.toLowerCase() !== "set-cookie") out.set(key, value);
   });
+  // Each Set-Cookie is its own header; copying them with set() would keep only the last.
+  for (const cookie of response.headers.getSetCookie()) out.append("set-cookie", cookie);
   return new Response(response.body, { status: response.status, headers: out });
 }
 
