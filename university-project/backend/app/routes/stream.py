@@ -18,6 +18,7 @@ from app.models import (
 from app.runtime import runtime
 from app.security import (
     decode_token,
+    is_revoked,
 )
 from app.util import (
     OPERATOR_ROLES,
@@ -56,7 +57,18 @@ def _snapshot(role: str, user_id: str, bank: str | None) -> list[dict]:
 @router.websocket("/ws")
 async def stream(websocket: WebSocket):
     await websocket.accept()
+    from app import sessions
+
     token = websocket.query_params.get("token")
+    if not token:
+        # A browser signed in with cookies sends them with the connection. Because cookies travel by themselves, the
+        # page that opened the connection must be one of ours: another site's page is refused.
+        portal = "customer" if websocket.query_params.get("portal") == "customer" else "operator"
+        token = websocket.cookies.get(sessions.names(portal)[0])
+        origin = websocket.headers.get("origin")
+        if token and origin and origin.rstrip("/") not in runtime.settings.allowed_origins:
+            await websocket.close(code=4403)
+            return
     if not token:
         await websocket.close(code=4401)
         return
@@ -67,7 +79,7 @@ async def stream(websocket: WebSocket):
         return
     with session_scope() as session:
         user = session.get(User, payload["sub"])
-        if user is None or user.status != "active":
+        if user is None or user.status != "active" or is_revoked(session, payload, user):
             await websocket.close(code=4401)
             return
         role, user_id, bank = user.role, user.id, user.bank
