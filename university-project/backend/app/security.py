@@ -95,6 +95,21 @@ def decode_token(settings, token: str, purpose: str = "access") -> dict:
     return payload
 
 
+def is_revoked(session, payload: dict, user) -> bool:
+    """True when this token was signed out, or was issued before the account's "sign out everywhere"."""
+    from app.models import RevokedToken
+
+    jti = payload.get("jti")
+    if jti and session.get(RevokedToken, jti) is not None:
+        return True
+    cutoff = getattr(user, "tokens_valid_after", None)
+    if cutoff is not None:
+        from app.util import aware
+
+        return int(payload.get("iat", 0)) <= int(aware(cutoff).timestamp())
+    return False
+
+
 def seal_totp(secret: str) -> str:
     """Authenticator secrets are stored AES-256-GCM encrypted."""
     from app.crypto import encrypt
