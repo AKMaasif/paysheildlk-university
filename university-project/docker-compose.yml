@@ -38,11 +38,12 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev-only-payshield-encryption-key}
       HMAC_KEY: ${HMAC_KEY:-dev-only-payshield-hmac-key}
       ANSWER_PEPPER: ${ANSWER_PEPPER:-payshield-pilot-pepper}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       META_API_KEY: ${META_API_KEY:-}
       META_BASE_URL: ${META_BASE_URL:-https://api.meta.ai/v1}
       META_MODEL: ${META_MODEL:-muse-ember-1.0}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+      XAI_BASE_URL: ${XAI_BASE_URL:-https://api.x.ai/v1}
+      XAI_MODEL: ${XAI_MODEL:-grok-4.20-0309-non-reasoning}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
       FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
