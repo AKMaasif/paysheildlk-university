@@ -179,15 +179,41 @@ test("after the alert the customer is asked to change their password, old then n
   await c2.close();
 });
 
-test("the customer's token cannot read the operator side", async () => {
+test("the session is an HttpOnly cookie that page scripts cannot read, and it cannot read the operator side", async () => {
   const { context, page } = await fresh();
   await signInCustomer(page, "nimal perera", "Lantern-7391");
   await page.waitForURL("**/c/home");
-  const customerToken = await page.evaluate(() => localStorage.getItem("payshield_customer"));
+  // Nothing a script on the page can see holds a credential.
+  const visible = await page.evaluate(() => ({ cookie: document.cookie, keys: Object.keys(localStorage), values: Object.values(localStorage).join(" ") }));
+  assert.ok(!/ps_customer/.test(visible.cookie), "the session cookie is hidden from scripts");
+  assert.ok(visible.keys.every((k) => !/token|refresh/i.test(k)), "no token key in storage: " + visible.keys);
+  assert.ok(!/eyJ/.test(visible.values), "no token-looking value in storage");
+  // The browser does hold it, marked HttpOnly and SameSite=Strict.
+  const cookies = await context.cookies();
+  const access = cookies.find((c) => c.name === "ps_customer_at");
+  const refresh = cookies.find((c) => c.name === "ps_customer_rt");
+  assert.ok(access && refresh, "both session cookies are set");
+  for (const c of [access, refresh]) assert.ok(c.httpOnly && c.sameSite === "Strict", `${c.name} is HttpOnly and SameSite=Strict`);
+  // The customer's credential still cannot read the operator side.
   for (const path of ["/api/overview", "/api/cases", "/api/analytics", "/api/security/status", "/api/agents"]) {
-    const reply = await fetch(API + path, { headers: { Authorization: `Bearer ${customerToken}` } });
+    const reply = await fetch(API + path, { headers: { Authorization: `Bearer ${access.value}` } });
     assert.equal(reply.status, 403, path);
   }
+  await context.close();
+});
+
+test("a reload keeps the customer signed in, and signing out clears the cookies and closes the account page", async () => {
+  const { context, page } = await fresh();
+  await signInCustomer(page, "nimal perera", "Lantern-7391");
+  await page.waitForURL("**/c/home");
+  await page.reload();
+  await page.waitForURL("**/c/home");
+  assert.ok((await context.cookies()).some((c) => c.name === "ps_customer_at"));
+  await page.getByRole("button", { name: /log out|sign out/i }).first().click();
+  await page.waitForURL(/\/c(\/login)?$/);
+  assert.ok(!(await context.cookies()).some((c) => c.name === "ps_customer_at" && c.value), "the cookie is gone");
+  await page.goto(`${WEB}/c/home`);
+  await page.waitForURL("**/c/login");
   await context.close();
 });
 
