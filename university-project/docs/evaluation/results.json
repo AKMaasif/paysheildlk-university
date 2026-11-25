@@ -546,7 +546,7 @@
     },
     "model_single_agent": {
       "ran": false,
-      "reason": "No GEMINI_API_KEY or META_API_KEY is set. The mock model has no judgement, so a result from it would be invented."
+      "reason": "No META_API_KEY or XAI_API_KEY is set. The mock model has no judgement, so a result from it would be invented."
     },
     "reach": {
       "per_agent": {
