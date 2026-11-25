@@ -28,7 +28,7 @@ USERS = {C: "cus_nimal", A: "usr_auditor", S: "usr_supervisor", T: "usr_telco", 
 POLICY = {
     ("GET", "/"): PUBLIC, ("GET", "/api/health"): PUBLIC, ("GET", "/api/ready"): PUBLIC,
     ("POST", "/api/auth/login"): PUBLIC, ("POST", "/api/auth/refresh"): PUBLIC, ("POST", "/api/auth/request-access"): PUBLIC,
-    ("POST", "/api/auth/activate"): PUBLIC, ("POST", "/api/auth/totp"): PUBLIC,
+    ("POST", "/api/auth/activate"): PUBLIC, ("POST", "/api/auth/totp"): PUBLIC, ("POST", "/api/auth/logout"): PUBLIC,
     ("POST", "/sim-swap/v1/check"): PUBLIC, ("POST", "/sim-swap/v1/retrieve-date"): PUBLIC,
     ("GET", "/api/customer/register/challenge"): PUBLIC, ("POST", "/api/customer/register"): PUBLIC,
     ("POST", "/api/customer/totp/confirm"): PUBLIC,
@@ -134,7 +134,7 @@ def _booted(tmp_path_factory):
     env = {
         "DATABASE_URL": database or f"sqlite:///{folder}/app.db", "CHECKPOINT_PATH": str(folder / "cp.sqlite"), "CHECKPOINTER": "postgres" if database else "sqlite", "REDIS_URL": redis_url or "",
         "JWT_SECRET": "test-secret-not-for-production-use", "STEP_DELAY_MS": "0", "FACE_ENGINE": "legacy", "DEMO_ASSIST": "true",
-        "GEMINI_API_KEY": "", "META_API_KEY": "", "TEXTLK_API_KEY": "", "SMTP_HOST": "", "FIREBASE_PROJECT_ID": "",
+        "XAI_API_KEY": "", "META_API_KEY": "", "TEXTLK_API_KEY": "", "SMTP_HOST": "", "FIREBASE_PROJECT_ID": "",
     }
     saved = {k: os.environ.get(k) for k in env}
     os.environ.update(env)
