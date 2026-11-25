@@ -3,11 +3,43 @@
 What was tested, what the tests found, what they did not cover. This is the result of running `docs/TEST_PLAN.md`.
 Every number below was produced by a run in this repository; the commands to reproduce each are at the end.
 
+## 0. Update: the latest run (read this first)
+
+The numbers in sections 1 to 6 were measured earlier and are kept as history. After that, the demonstration work and
+the hardening in `docs/FIX_PLAN.md` changed the code, and later work added real sign-out, more encrypted data, a key
+rotation tool, Meta and Grok as the model providers (Gemini removed), and a fresh round of checks. This section is what
+was measured on the final code. Each suite was run on its own, one after another.
+
+| Check | Result on the final code |
+| --- | --- |
+| Backend suite on SQLite, with coverage | **1,791 passed, 4 skipped, 0 failed** in 22 min 13 s (the skips need real face photos) |
+| Backend suite on **Postgres 16 and Redis 7** (the CI ports) | **1,787 passed, 6 skipped, 2 failed** in 20 min 32 s. The 2 failures were two migration tests of mine that wrote a fake "0005" revision after the real 0005 existed. They now compute the next revision from the real head; those files were re-run on Postgres and SQLite and pass (20 passed, 1 skipped on Postgres). The whole Postgres suite was not run a second time |
+| Coverage | **93.5% lines** (7,049 of 7,434 statements) and **88.6% branches** (1,727 of 1,950), from `python -m qa.coverage_by_agent`. Per agent: Risk 100, Policy 99.2, Alert 99.6, Analytics 99.6, Report 99.4, Banking 98.1, Response 98.7, Telecom 95.9, Supervisor 94.6, Verification 92.7 (lines) |
+| Browser suite (Playwright, desktop, tablet, phone) | **75 of 75 passed** on a fresh frontend build: 74 tests plus the screenshot file, which does nothing unless asked. Covers the authenticator step, chosen usernames, eight-question rounds and the cookie sessions (HttpOnly and SameSite=Strict, hidden from scripts, cleared at sign-out) |
+| Frontend logic tests | **31 of 31 passed** (section 2 below still says 20) |
+| Type check | clean (`tsc --noEmit`) |
+| Lint | clean: `ruff check app qa evaluation tests` (the command CI runs) |
+| Static scan | `bandit -r app -ll`: no medium or high findings |
+| Dependency audits | `pip-audit -r requirements.txt`: no known vulnerabilities. `npm audit --omit=dev` (frontend): 0 vulnerabilities |
+| Mutation spot-check | **58 of 58 killed.** The 38 earlier mutants were all re-run (five had their file paths updated after the file split, two had their patterns updated after code changed), plus 20 new mutants for the rules added since: authenticator step, code replay, lockouts, trusted proxies, per-username limits, encrypted fields, key length, answer scheme, repeated questions, usernames, frame and body limits, the site header, the live-stream origin check, token revocation, telecom event ingestion, the last look before release, fallback marking, and sign-out of one portal only |
+| API permission matrix | all **68** operations have a policy (`POST /api/sim-events` and `POST /api/auth/logout` were added since section 2's 66) |
+| Scenario matrix | `python -m qa.scenario_matrix` on the final code: **12 scenario paths, 0 not as expected** (`docs/SCENARIO_MATRIX.md`, evidence in `docs/evidence/scenario_evidence.json`) |
+
+**Not re-run in this pass:** the load and concurrency numbers (section 2 and criterion 7), and any live-provider check
+(real SMS, email, push, Meta or Grok calls, the operator gateway), which need credentials this environment does not
+have. CI runs the Postgres/Redis job on GitHub; its result on this branch has not been seen from here.
+
+**One run to know about:** a full backend run executed while the browser suite was running on the same machine failed
+one resilience test that passes alone and in a clean full run. Suites are timing-sensitive when run together; run them
+one at a time.
+
+What changed since the first report is listed in `docs/STATUS.md`.
+
 ## 1. Result in one table
 
 | Exit criterion (from the plan) | Result | Evidence |
 | --- | --- | --- |
-| 1. Every test passes, twice in a row | **Met** | Backend suite green on consecutive full runs on SQLite and on Postgres with Redis; browser suite 73 of 73 on consecutive runs; frontend 20 of 20 |
+| 1. Every test passes, twice in a row | **Met** | Backend suite green on consecutive full runs on SQLite and on Postgres with Redis; browser suite 73 of 73 on consecutive runs; frontend 20 of 20 (28 of 28 in the latest run, section 0) |
 | 2. Line coverage 85% overall, 95% on the money-critical modules, branch 75% | **Met** | 93.1% lines, 88.2% branches. `risk` 100, `critic` 100, `charters` 100, `privacy` 100, `ledger` 99.1, `profile` 98.1, `protocol` 98.4 |
 | 3. Each agent has at least its planned number of tests | **Met for nine of ten agents** | See section 3. Risk is at about 28 of 31 |
 | 4. Mutation spot-check kills at least 90% | **Met** | 38 mutants; the first 28 were 93% killed on the first run, the 2 survivors were dealt with, and all 38 are killed now |
