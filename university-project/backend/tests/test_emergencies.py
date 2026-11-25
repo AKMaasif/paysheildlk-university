@@ -138,13 +138,13 @@ def test_with_both_models_down_the_rules_still_hold_and_nothing_is_released(boot
     normal = trigger("cus_nimal", "sim_swap_transfer")
     begin_case(normal)
     baseline = _state(normal)
-    monkeypatch.setattr(runtime.settings, "gemini_api_key", "set-but-down")
+    monkeypatch.setattr(runtime.settings, "meta_api_key", "set-but-down")
     faults.turn_on("llm_down")
     drilled = trigger("cus_nimal", "sim_swap_transfer")
     begin_case(drilled)
     status, money, decision, _ = _state(drilled)
     assert (status, money, decision) == (baseline[0], baseline[1], baseline[2]) == ("waiting_customer", "held", "hold")
-    notes = [event for event in _events(drilled) if event[3] in {"mock", "gemini"} and event[0] in {"telecom", "banking", "risk"} and event[1] == "done"]
+    notes = [event for event in _events(drilled) if event[3] in {"mock", "meta"} and event[0] in {"telecom", "banking", "risk"} and event[1] == "done"]
     assert notes and all(event[3] == "mock" and event[4] is True for event in notes)
 
 
