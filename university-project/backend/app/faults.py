@@ -14,7 +14,7 @@ _active: dict[str, str] = {}
 
 # name -> what it simulates
 KNOWN: dict[str, str] = {
-    "llm_down": "Gemini and the fallback model are both unreachable",
+    "llm_down": "Meta and the Grok fallback are both unreachable",
     "sms_down": "The SMS gateway is failing",
     "email_down": "The email server is failing",
     "fail_agent": "One agent crashes the next time it runs",
