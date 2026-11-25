@@ -10,7 +10,7 @@ def test_camara_check_and_retrieve_date(tmp_path, monkeypatch):
     monkeypatch.setenv("REDIS_URL", "")
     monkeypatch.setenv("JWT_SECRET", "test-secret-not-for-production-use")
     monkeypatch.setenv("STEP_DELAY_MS", "0")
-    monkeypatch.setenv("GEMINI_API_KEY", "")
+    monkeypatch.setenv("XAI_API_KEY", "")
     monkeypatch.setenv("META_API_KEY", "")
 
     with TestClient(app) as client:
