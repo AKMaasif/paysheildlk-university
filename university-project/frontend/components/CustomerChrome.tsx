@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Logo } from "@/components/Icons";
-import { clearToken } from "@/lib/api";
+import { clearSession } from "@/lib/api";
 
 type IconName = "check" | "lock" | "phone" | "camera" | "receipt" | "wallet" | "key" | "bell" | "clock" | "eye";
 
@@ -115,8 +115,7 @@ export function AppBar({ name }: { name?: string }) {
   const path = usePathname();
   const router = useRouter();
   function signOut() {
-    clearToken("customer");
-    localStorage.removeItem("payshield_customer_user");
+    void clearSession("customer");
     router.replace("/c");
   }
   return (
