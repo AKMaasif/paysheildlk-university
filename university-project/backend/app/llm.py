@@ -90,22 +90,31 @@ def _mock_text(purpose: str, user: str) -> str:
 
 
 class LLMRouter:
+    """Meta is the main model and Grok (xAI) is the fallback. Both speak the OpenAI-style chat-completions format. With
+    neither key set, or when both fail, the deterministic mock writes the note, so a case never waits on a model."""
+
     def __init__(
         self,
         *,
-        gemini_api_key: str = "",
-        gemini_model: str = "gemini-2.5-flash",
         meta_api_key: str = "",
         meta_base_url: str = "https://api.meta.ai/v1",
         meta_model: str = "muse-ember-1.0",
+        xai_api_key: str = "",
+        xai_base_url: str = "https://api.x.ai/v1",
+        xai_model: str = "grok-4.20-0309-non-reasoning",
         transport=None,
     ):
-        self.gemini_api_key = gemini_api_key
-        self.gemini_model = gemini_model
         self.meta_api_key = meta_api_key
         self.meta_base_url = meta_base_url.rstrip("/")
         self.meta_model = meta_model
+        self.xai_api_key = xai_api_key
+        self.xai_base_url = xai_base_url.rstrip("/")
+        self.xai_model = xai_model
         self.transport = transport or HttpxTransport()
+
+    def _providers(self) -> list[str]:
+        """The configured providers in the order they are tried."""
+        return [name for name, key in (("meta", self.meta_api_key), ("grok", self.xai_api_key)) if key]
 
     def complete(self, *, system: str, user: str, purpose: str) -> LLMResult:
         from app.privacy import guard
@@ -115,34 +124,24 @@ class LLMRouter:
         user = guard(user)
         from app import faults
 
+        providers = self._providers()
         if faults.is_on("llm_down"):
             # Drill: every provider fails. The rules engine writes the note and the case carries on.
-            primary = "gemini" if self.gemini_api_key or not self.meta_api_key else "meta"
-            return self._mock(purpose, user, fell_back=True, fallback_from=primary)
-        if not self.gemini_api_key and not self.meta_api_key:
+            return self._mock(purpose, user, fell_back=True, fallback_from=providers[0] if providers else "meta")
+        if not providers:
             return self._mock(purpose, user, fell_back=False, fallback_from=None)
 
-        if self.gemini_api_key:
+        for position, name in enumerate(providers):
             try:
-                return self._gemini(system, user)
+                result = self._meta(system, user) if name == "meta" else self._grok(system, user)
             except Exception as exc:
-                log.warning("gemini call failed for %s: %s", purpose, exc)
-                if self.meta_api_key:
-                    try:
-                        result = self._meta(system, user)
-                        result.fell_back = True
-                        result.fallback_from = "gemini"
-                        return result
-                    except Exception as meta_exc:
-                        log.warning("meta fallback failed for %s: %s", purpose, meta_exc)
-                result = self._mock(purpose, user, fell_back=True, fallback_from="gemini")
-                return result
-
-        try:
-            return self._meta(system, user)
-        except Exception as exc:
-            log.warning("meta call failed for %s: %s", purpose, exc)
-            return self._mock(purpose, user, fell_back=True, fallback_from="meta")
+                log.warning("%s call failed for %s: %s", name, purpose, exc)
+                continue
+            if position > 0:
+                result.fell_back = True
+                result.fallback_from = providers[0]
+            return result
+        return self._mock(purpose, user, fell_back=True, fallback_from=providers[0])
 
     def _mock(self, purpose: str, user: str, fell_back: bool, fallback_from: str | None) -> LLMResult:
         started = time.perf_counter()
@@ -156,45 +155,14 @@ class LLMRouter:
             fallback_from=fallback_from,
         )
 
-    def _gemini(self, system: str, user: str) -> LLMResult:
+    def _chat(self, provider: str, base_url: str, api_key: str, model: str, system: str, user: str, timeout: float) -> LLMResult:
+        """One OpenAI-style chat-completions call. The key goes in the Authorization header and nowhere else."""
         started = time.perf_counter()
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{self.gemini_model}:generateContent?key={self.gemini_api_key}"
-        )
+        url = f"{base_url}/chat/completions"
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        # Reasoning models spend tokens thinking before they answer, so the completion budget stays large.
         body = {
-            "systemInstruction": {"parts": [{"text": system}]},
-            "contents": [{"role": "user", "parts": [{"text": user}]}],
-            "generationConfig": {"maxOutputTokens": 2048, "temperature": 0.2},
-        }
-        data = self.transport.post_json(url, {}, body, timeout=30)
-        candidates = data.get("candidates") or []
-        if not candidates:
-            raise LLMError("gemini", "no candidates")
-        parts = ((candidates[0].get("content") or {}).get("parts")) or []
-        texts = []
-        for part in parts:
-            if part.get("thought"):
-                continue
-            if part.get("text"):
-                texts.append(part["text"])
-        text = "\n".join(texts).strip()
-        if not text:
-            raise LLMError("gemini", "empty content")
-        return LLMResult(
-            text=text,
-            provider="gemini",
-            model=self.gemini_model,
-            latency_ms=int((time.perf_counter() - started) * 1000),
-        )
-
-    def _meta(self, system: str, user: str) -> LLMResult:
-        started = time.perf_counter()
-        url = f"{self.meta_base_url}/chat/completions"
-        headers = {"Authorization": f"Bearer {self.meta_api_key}", "Content-Type": "application/json"}
-        # Muse models spend tokens on reasoning, so the completion budget stays large.
-        body = {
-            "model": self.meta_model,
+            "model": model,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -202,10 +170,10 @@ class LLMRouter:
             "max_tokens": 4096,
             "temperature": 0.2,
         }
-        data = self.transport.post_json(url, headers, body, timeout=45)
+        data = self.transport.post_json(url, headers, body, timeout=timeout)
         choices = data.get("choices") or []
         if not choices:
-            raise LLMError("meta", "no choices")
+            raise LLMError(provider, "no choices")
         message = choices[0].get("message") or {}
         content = message.get("content") or ""
         if isinstance(content, list):
@@ -218,10 +186,16 @@ class LLMRouter:
             content = "".join(chunks)
         text = str(content).strip()
         if not text:
-            raise LLMError("meta", "empty content")
+            raise LLMError(provider, "empty content")
         return LLMResult(
             text=text,
-            provider="meta",
-            model=self.meta_model,
+            provider=provider,
+            model=model,
             latency_ms=int((time.perf_counter() - started) * 1000),
         )
+
+    def _meta(self, system: str, user: str) -> LLMResult:
+        return self._chat("meta", self.meta_base_url, self.meta_api_key, self.meta_model, system, user, timeout=45)
+
+    def _grok(self, system: str, user: str) -> LLMResult:
+        return self._chat("grok", self.xai_base_url, self.xai_api_key, self.xai_model, system, user, timeout=45)
