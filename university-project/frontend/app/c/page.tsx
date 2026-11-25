@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Brand, Ico, SiteNav } from "@/components/CustomerChrome";
-import { getToken } from "@/lib/api";
+import { isSignedIn } from "@/lib/api";
 
 function Tick() {
   return (
@@ -15,7 +15,7 @@ function Tick() {
 
 export default function Landing() {
   const [signedIn, setSignedIn] = useState(false);
-  useEffect(() => setSignedIn(!!getToken("customer")), []);
+  useEffect(() => setSignedIn(isSignedIn("customer")), []);
 
   return (
     <>
