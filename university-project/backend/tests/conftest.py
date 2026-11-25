@@ -16,7 +16,7 @@ def boot(tmp_path, monkeypatch):
     monkeypatch.setenv("STEP_DELAY_MS", "0")
     monkeypatch.setenv("FACE_ENGINE", "legacy")
     monkeypatch.setenv("DEMO_ASSIST", "true")
-    monkeypatch.setenv("GEMINI_API_KEY", "")
+    monkeypatch.setenv("XAI_API_KEY", "")
     monkeypatch.setenv("META_API_KEY", "")
     monkeypatch.setenv("REALERT_SECONDS", "180")
     monkeypatch.setenv("ESCALATE_SECONDS", "600")
