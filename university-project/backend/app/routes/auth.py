@@ -4,8 +4,10 @@ import logging
 from fastapi import (
     APIRouter,
     Depends,
+    Header,
     HTTPException,
     Request,
+    Response,
 )
 from pydantic import BaseModel, Field
 
@@ -21,14 +23,15 @@ from app.routes.common import (
     _client_ip,
     _pending_step,
     _public_user,
-    _session_tokens,
     current_user,
+    finish_session,
 )
 from app.runtime import runtime
 from app.security import (
     create_token,
     decode_token,
     hash_password,
+    is_revoked,
     open_totp,
     password_needs_upgrade,
     totp_accept,
@@ -56,7 +59,14 @@ class TotpIn(BaseModel):
 
 
 class RefreshIn(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None  # a browser in cookie mode leaves this out: the refresh cookie is used
+    portal: str = "operator"
+
+
+class LogoutIn(BaseModel):
+    portal: str = "operator"
+    refresh_token: str | None = None  # a client that is not a browser names the refresh token to end as well
+    everywhere: bool = False  # also end every other session of this account, on every device
 
 
 class AccessIn(BaseModel):
@@ -90,7 +100,7 @@ def _find_login_user(session, identifier: str, portal: str) -> User | None:
 
 
 @router.post("/api/auth/login")
-def login(body: LoginIn, request: Request):
+def login(body: LoginIn, request: Request, response: Response):
     ident = " ".join(body.email.strip().lower().split())
     ip = _client_ip(request)
     ratelimit.take("login_ip", ip)
@@ -126,11 +136,11 @@ def login(body: LoginIn, request: Request):
         audit(ident, "sign_in_password_ok", user_id, "customer password accepted, authenticator code required" if enrolled else "customer password accepted, authenticator set-up required")
         return _pending_step(user_id, enrolled)
     audit(ident, "sign_in", user_id, f"{body.portal} sign-in")
-    return {**_session_tokens(user_id, role), "user": snapshot}
+    return finish_session(request, response, user_id, role, snapshot)
 
 
 @router.post("/api/auth/totp")
-def confirm_login_totp(body: TotpIn, request: Request):
+def confirm_login_totp(body: TotpIn, request: Request, response: Response):
     ratelimit.take("login_ip", _client_ip(request))
     try:
         payload = decode_token(runtime.settings, body.pending_token, purpose="totp")
@@ -153,23 +163,84 @@ def confirm_login_totp(body: TotpIn, request: Request):
         audit(refused[0], "sign_in_code_failed", refused[1], "authenticator code not accepted")
         raise HTTPException(status_code=401, detail="That code is not valid, or it was already used. Wait for your authenticator app to show a new 6-digit code and try again.")
     audit(who, "sign_in", user_id, "customer sign-in with authenticator code")
-    return {**_session_tokens(user_id, role), "user": snapshot}
+    return finish_session(request, response, user_id, role, snapshot)
 
 
 @router.post("/api/auth/refresh")
-def refresh_session(body: RefreshIn, request: Request):
+def refresh_session(body: RefreshIn, request: Request, response: Response):
+    from app import sessions
+
     ratelimit.take("refresh", _client_ip(request))
+    cookie_mode = sessions.wants_cookies(request)
+    portal = "customer" if body.portal == "customer" else "operator"
+    if cookie_mode and request.headers.get(sessions.CSRF_HEADER, "") != sessions.CSRF_VALUE:
+        raise HTTPException(status_code=403, detail="This request must come from the PayShield site.")
+    refresh = request.cookies.get(sessions.names(portal)[1]) if cookie_mode else body.refresh_token
     try:
-        payload = decode_token(runtime.settings, body.refresh_token, purpose="refresh")
+        payload = decode_token(runtime.settings, refresh or "", purpose="refresh")
     except Exception as exc:
         raise HTTPException(status_code=401, detail="Session expired") from exc
     with session_scope() as session:
         user = session.get(User, payload.get("sub"))
-        if user is None or user.status != "active" or user.role != payload.get("role"):
+        if user is None or user.status != "active" or user.role != payload.get("role") or is_revoked(session, payload, user):
             raise HTTPException(status_code=401, detail="Session expired")
         user_id, role = user.id, user.role
+    if cookie_mode and sessions.portal_for_role(role) != portal:
+        raise HTTPException(status_code=401, detail="Session expired")
     # Only a new access token. The refresh token keeps its original expiry, so a session cannot live forever.
-    return {"token": create_token(runtime.settings, user_id, role, purpose="access")}
+    token = create_token(runtime.settings, user_id, role, purpose="access")
+    if cookie_mode:
+        sessions.set_access(response, portal, token)
+        return {"session": "cookie"}
+    return {"token": token}
+
+
+@router.post("/api/auth/logout")
+def logout(request: Request, response: Response, body: LogoutIn | None = None, authorization: str | None = Header(default=None)):
+    """End a session. The tokens in use are recorded as revoked, so a copy taken earlier stops working at once and not only
+    when it expires, and the browser's cookies are cleared. With `everywhere`, every other session of the account ends too."""
+    from datetime import datetime, timezone
+
+    from app import sessions
+    from app.models import RevokedToken
+
+    portal = "customer" if body and body.portal == "customer" else "operator"
+    candidates = [request.cookies.get(name) for name in sessions.names(portal)]
+    if authorization and authorization.lower().startswith("bearer "):
+        candidates.append(authorization.split(" ", 1)[1].strip())
+    if body and body.refresh_token:
+        candidates.append(body.refresh_token)
+    now = utcnow()
+    owner = None
+    seen: set[str] = set()  # the same token can arrive in a cookie, a header and the body
+    with session_scope() as session:
+        session.query(RevokedToken).filter(RevokedToken.expires_at < now).delete()  # tidy up: expired ones need no record
+        for token in candidates:
+            if not token:
+                continue
+            payload = None
+            for purpose in ("access", "refresh"):
+                try:
+                    payload = decode_token(runtime.settings, token, purpose=purpose)
+                    break
+                except Exception:
+                    payload = None
+            if payload is None or not payload.get("jti"):
+                continue
+            if sessions.portal_for_role(payload.get("role", "")) != portal:
+                continue  # a token of the other portal, supplied by the browser's other cookie, is not ended here
+            owner = payload.get("sub")
+            if payload["jti"] not in seen and session.get(RevokedToken, payload["jti"]) is None:
+                seen.add(payload["jti"])
+                session.add(RevokedToken(jti=payload["jti"], user_id=owner, expires_at=datetime.fromtimestamp(payload["exp"], tz=timezone.utc), revoked_at=now))
+        if body and body.everywhere and owner:
+            user = session.get(User, owner)
+            if user is not None:
+                user.tokens_valid_after = now
+    if owner:
+        audit(owner, "sign_out", owner, "everywhere" if body and body.everywhere else "this session")
+    sessions.clear_session(response, portal)
+    return {"ok": True}
 
 
 @router.post("/api/auth/request-access")
