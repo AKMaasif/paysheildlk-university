@@ -75,8 +75,10 @@ def test_an_empty_database_is_created_and_marked_current(tmp_path):
 def test_a_database_at_an_older_revision_is_upgraded_and_keeps_its_data(tmp_path):
     scripts = tmp_path / "scripts"
     shutil.copytree(migrate.HERE, scripts, ignore=shutil.ignore_patterns("__pycache__"))
-    (scripts / "versions" / "0004_add_nickname.py").write_text(
-        '"""add a nickname"""\nimport sqlalchemy as sa\nfrom alembic import op\n\nrevision = "0004"\ndown_revision = "0003"\nbranch_labels = None\ndepends_on = None\n\n\n'
+    head = migrate.head_revision()
+    nxt = f"{int(head) + 1:04d}"  # the revision after the real newest one, so this test never collides with a new migration
+    (scripts / "versions" / f"{nxt}_add_nickname.py").write_text(
+        '"""add a nickname"""\nimport sqlalchemy as sa\nfrom alembic import op\n\n' + f'revision = "{nxt}"\ndown_revision = "{head}"\n' + 'branch_labels = None\ndepends_on = None\n\n\n'
         'def upgrade() -> None:\n    op.add_column("users", sa.Column("nickname", sa.String(40), nullable=True))\n\n\n'
         'def downgrade() -> None:\n    op.drop_column("users", "nickname")\n'
     )
@@ -86,7 +88,7 @@ def test_a_database_at_an_older_revision_is_upgraded_and_keeps_its_data(tmp_path
     add_user(engine)
     assert migrate.upgrade(engine, scripts=scripts) == "upgraded"
     assert "nickname" in {c["name"] for c in inspect(engine).get_columns("users")}
-    assert migrate.current_revision(engine) == "0004"
+    assert migrate.current_revision(engine) == nxt
     with engine.connect() as connection:
         email, nickname = connection.execute(text("SELECT email, nickname FROM users WHERE id='u1'")).one()
     from app.config import Settings
@@ -160,9 +162,9 @@ def test_the_new_migration_command_writes_a_script_when_a_model_has_changed(tmp_
         path = migrate.new_revision("add nickname", scripts)
     finally:
         users._columns.remove(users.c.nickname)
-    assert path is not None and path.name.startswith("0004_add_nickname")
+    assert path is not None and path.name.startswith(f"{int(migrate.head_revision()) + 1:04d}_add_nickname")
     text_ = path.read_text()
-    assert "nickname" in text_ and 'down_revision = "0003"' in text_.replace("'", '"')
+    assert "nickname" in text_ and f'down_revision = "{migrate.head_revision()}"' in text_.replace("'", '"')
 
 
 def test_the_head_command_prints_the_newest_revision(capsys, monkeypatch):
