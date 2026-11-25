@@ -17,10 +17,10 @@ def _tools_called(run, agent):
 
 
 def _fake_model(monkeypatch, text):
-    monkeypatch.setattr(runtime.settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(runtime.settings, "meta_api_key", "test-key")
     monkeypatch.setattr(
         runtime.llm, "complete",
-        lambda **kw: LLMResult(text=text, provider="gemini", model="fake", latency_ms=1, fell_back=False, fallback_from=None),
+        lambda **kw: LLMResult(text=text, provider="meta", model="fake", latency_ms=1, fell_back=False, fallback_from=None),
     )
 
 
