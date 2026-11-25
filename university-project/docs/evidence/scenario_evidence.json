@@ -18,7 +18,7 @@
       "score": 100,
       "decision": "hold",
       "reason": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
-      "snapshot_digest": "6aae82b0316c8dbc",
+      "snapshot_digest": "d3180634bc650af3",
       "factors": [
         "sim_swap_24h",
         "new_imei",
@@ -121,7 +121,7 @@
           "result": {
             "channel": "push",
             "in_app": "stored",
-            "notification_id": "ntf_aff5003248",
+            "notification_id": "ntf_3001abccaa",
             "fcm": "skipped",
             "devices": 0,
             "delivery": {
@@ -135,7 +135,7 @@
               "retryable": false,
               "note": "Stored in the PayShield inbox. No push provider is in use."
             },
-            "latency_ms": 2
+            "latency_ms": 3
           }
         },
         {
@@ -146,7 +146,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[email]",
-            "notification_id": "ntf_361655d0aa",
+            "notification_id": "ntf_b2f73610f8",
             "attachments": [],
             "delivery": {
               "state": "logged_only",
@@ -159,7 +159,7 @@
               "retryable": false,
               "note": "Written to the server log and kept in the inbox. No email was sent."
             },
-            "latency_ms": 2,
+            "latency_ms": 3,
             "attempts": 1
           }
         },
@@ -171,7 +171,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[phone ..83]",
-            "notification_id": "ntf_003f165b78",
+            "notification_id": "ntf_4e04b95659",
             "delivery": {
               "state": "logged_only",
               "channel": "sms",
@@ -183,7 +183,7 @@
               "retryable": false,
               "note": "Written to the server log and kept in the inbox. No SMS was sent."
             },
-            "latency_ms": 2,
+            "latency_ms": 3,
             "attempts": 1
           }
         }
@@ -212,7 +212,7 @@
       "score": 100,
       "decision": "hold",
       "reason": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
-      "snapshot_digest": "2661430359ccad63",
+      "snapshot_digest": "7311a036b2af3d76",
       "factors": [
         "sim_swap_24h",
         "new_imei",
@@ -313,7 +313,7 @@
           "result": {
             "channel": "push",
             "in_app": "stored",
-            "notification_id": "ntf_9b413cf8d7",
+            "notification_id": "ntf_23e124e546",
             "fcm": "skipped",
             "devices": 0,
             "delivery": {
@@ -338,7 +338,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[email]",
-            "notification_id": "ntf_d1ad3d44b9",
+            "notification_id": "ntf_56c2c876e5",
             "attachments": [],
             "delivery": {
               "state": "logged_only",
@@ -351,7 +351,7 @@
               "retryable": false,
               "note": "Written to the server log and kept in the inbox. No email was sent."
             },
-            "latency_ms": 2,
+            "latency_ms": 3,
             "attempts": 1
           }
         },
@@ -363,7 +363,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[phone ..83]",
-            "notification_id": "ntf_036f77aa88",
+            "notification_id": "ntf_5aaab1683f",
             "delivery": {
               "state": "logged_only",
               "channel": "sms",
@@ -375,7 +375,7 @@
               "retryable": false,
               "note": "Written to the server log and kept in the inbox. No SMS was sent."
             },
-            "latency_ms": 2,
+            "latency_ms": 3,
             "attempts": 1
           }
         }
@@ -403,7 +403,7 @@
       "score": 100,
       "decision": "hold",
       "reason": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
-      "snapshot_digest": "bcfe27bdbfc4c122",
+      "snapshot_digest": "a0e764d1c6614fe6",
       "factors": [
         "sim_swap_24h",
         "new_imei",
@@ -473,7 +473,7 @@
           "result": {
             "channel": "push",
             "in_app": "stored",
-            "notification_id": "ntf_5b09ce1e2d",
+            "notification_id": "ntf_74244e5e1a",
             "fcm": "skipped",
             "devices": 0,
             "delivery": {
@@ -498,7 +498,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[email]",
-            "notification_id": "ntf_92a02f40bf",
+            "notification_id": "ntf_151c20b1b7",
             "attachments": [],
             "delivery": {
               "state": "logged_only",
@@ -523,7 +523,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[phone ..83]",
-            "notification_id": "ntf_0d66844bb9",
+            "notification_id": "ntf_[account ..58]",
             "delivery": {
               "state": "logged_only",
               "channel": "sms",
@@ -535,7 +535,7 @@
               "retryable": false,
               "note": "Written to the server log and kept in the inbox. No SMS was sent."
             },
-            "latency_ms": 3,
+            "latency_ms": 4,
             "attempts": 1
           }
         }
@@ -564,7 +564,7 @@
       "score": 100,
       "decision": "block",
       "reason": "Rule: an open port-out, a password reset within 6 hours, a new payee, and a transfer of at least Rs. 500,000. The transfer is blocked without waiting.",
-      "snapshot_digest": "f2376b02ffe13106",
+      "snapshot_digest": "f9cee23d868cd341",
       "factors": [
         "sim_swap_24h",
         "port_out",
@@ -751,7 +751,7 @@
       "score": 100,
       "decision": "hold",
       "reason": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
-      "snapshot_digest": "097b599bd1790a6e",
+      "snapshot_digest": "81724dcea0a5f484",
       "factors": [
         "sim_swap_24h",
         "new_imei",
@@ -865,7 +865,7 @@
           "result": {
             "channel": "push",
             "in_app": "stored",
-            "notification_id": "ntf_e461be4c72",
+            "notification_id": "ntf_5fc896cfd6",
             "fcm": "skipped",
             "devices": 0,
             "delivery": {
@@ -879,7 +879,7 @@
               "retryable": false,
               "note": "Stored in the PayShield inbox. No push provider is in use."
             },
-            "latency_ms": 1
+            "latency_ms": 3
           }
         },
         {
@@ -890,7 +890,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[email]",
-            "notification_id": "ntf_abc3f659a9",
+            "notification_id": "ntf_32e0301e18",
             "attachments": [],
             "delivery": {
               "state": "logged_only",
@@ -903,7 +903,7 @@
               "retryable": false,
               "note": "Written to the server log and kept in the inbox. No email was sent."
             },
-            "latency_ms": 2,
+            "latency_ms": 4,
             "attempts": 1
           }
         },
@@ -915,7 +915,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[phone ..83]",
-            "notification_id": "ntf_bcd16ab357",
+            "notification_id": "ntf_041386e954",
             "delivery": {
               "state": "logged_only",
               "channel": "sms",
@@ -927,7 +927,7 @@
               "retryable": false,
               "note": "Written to the server log and kept in the inbox. No SMS was sent."
             },
-            "latency_ms": 2,
+            "latency_ms": 3,
             "attempts": 1
           }
         }
@@ -956,7 +956,7 @@
       "score": 100,
       "decision": "hold",
       "reason": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
-      "snapshot_digest": "0837bace59a3a9aa",
+      "snapshot_digest": "5d6ab5e6b0433474",
       "factors": [
         "sim_swap_24h",
         "new_imei",
@@ -1023,7 +1023,7 @@
           "result": {
             "channel": "push",
             "in_app": "stored",
-            "notification_id": "ntf_d7f382ae8f",
+            "notification_id": "ntf_6349fd3ed6",
             "fcm": "skipped",
             "devices": 0,
             "delivery": {
@@ -1048,7 +1048,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[email]",
-            "notification_id": "ntf_[account ..73]f",
+            "notification_id": "ntf_cab8aef19e",
             "attachments": [],
             "delivery": {
               "state": "logged_only",
@@ -1061,7 +1061,7 @@
               "retryable": false,
               "note": "Written to the server log and kept in the inbox. No email was sent."
             },
-            "latency_ms": 2,
+            "latency_ms": 3,
             "attempts": 1
           }
         },
@@ -1073,7 +1073,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[phone ..83]",
-            "notification_id": "ntf_f[account ..89]",
+            "notification_id": "ntf_8d30eebc0b",
             "delivery": {
               "state": "logged_only",
               "channel": "sms",
@@ -1085,7 +1085,7 @@
               "retryable": false,
               "note": "Written to the server log and kept in the inbox. No SMS was sent."
             },
-            "latency_ms": 2,
+            "latency_ms": 4,
             "attempts": 1
           }
         }
@@ -1114,7 +1114,7 @@
       "score": 100,
       "decision": "hold",
       "reason": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
-      "snapshot_digest": "1b50e65a2dce0357",
+      "snapshot_digest": "01e920dcc4bc7956",
       "factors": [
         "sim_swap_24h",
         "new_imei",
@@ -1173,7 +1173,7 @@
           "result": {
             "channel": "push",
             "in_app": "stored",
-            "notification_id": "ntf_c638a695a7",
+            "notification_id": "ntf_b2c71af14b",
             "fcm": "skipped",
             "devices": 0,
             "delivery": {
@@ -1187,7 +1187,7 @@
               "retryable": false,
               "note": "Stored in the PayShield inbox. No push provider is in use."
             },
-            "latency_ms": 2
+            "latency_ms": 3
           }
         },
         {
@@ -1323,7 +1323,7 @@
           "result": {
             "channel": "push",
             "in_app": "stored",
-            "notification_id": "ntf_7ffbfae042",
+            "notification_id": "ntf_06aa355eaf",
             "fcm": "skipped",
             "devices": 0,
             "delivery": {
@@ -1337,7 +1337,7 @@
               "retryable": false,
               "note": "Stored in the PayShield inbox. No push provider is in use."
             },
-            "latency_ms": 2
+            "latency_ms": 3
           }
         },
         {
@@ -1348,7 +1348,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[email]",
-            "notification_id": "ntf_7c8405ffdc",
+            "notification_id": "ntf_0174858acc",
             "attachments": [],
             "delivery": {
               "state": "logged_only",
@@ -1361,7 +1361,7 @@
               "retryable": false,
               "note": "Written to the server log and kept in the inbox. No email was sent."
             },
-            "latency_ms": 2,
+            "latency_ms": 4,
             "attempts": 1
           }
         },
@@ -1373,7 +1373,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[phone ..83]",
-            "notification_id": "ntf_19cde36ff6",
+            "notification_id": "ntf_732377c331",
             "delivery": {
               "state": "logged_only",
               "channel": "sms",
@@ -1385,7 +1385,7 @@
               "retryable": false,
               "note": "Written to the server log and kept in the inbox. No SMS was sent."
             },
-            "latency_ms": 2,
+            "latency_ms": 4,
             "attempts": 1
           }
         }
@@ -1526,7 +1526,7 @@
           "result": {
             "channel": "push",
             "in_app": "stored",
-            "notification_id": "ntf_4f6549d6b3",
+            "notification_id": "ntf_1146f46ba2",
             "fcm": "skipped",
             "devices": 0,
             "delivery": {
@@ -1540,7 +1540,7 @@
               "retryable": false,
               "note": "Stored in the PayShield inbox. No push provider is in use."
             },
-            "latency_ms": 2
+            "latency_ms": 3
           }
         },
         {
@@ -1551,7 +1551,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[email]",
-            "notification_id": "ntf_7870e3b3c8",
+            "notification_id": "ntf_41ad510e8d",
             "attachments": [],
             "delivery": {
               "state": "logged_only",
@@ -1564,7 +1564,7 @@
               "retryable": false,
               "note": "Written to the server log and kept in the inbox. No email was sent."
             },
-            "latency_ms": 2,
+            "latency_ms": 3,
             "attempts": 1
           }
         },
@@ -1576,7 +1576,7 @@
             "status": "logged",
             "driver": "log",
             "to": "[phone ..83]",
-            "notification_id": "ntf_472d94ae84",
+            "notification_id": "ntf_7e48ea95d9",
             "delivery": {
               "state": "logged_only",
               "channel": "sms",
@@ -1588,7 +1588,7 @@
               "retryable": false,
               "note": "Written to the server log and kept in the inbox. No SMS was sent."
             },
-            "latency_ms": 2,
+            "latency_ms": 3,
             "attempts": 1
           }
         }
@@ -1626,8 +1626,8 @@
         "verify_handoff",
         "get_recent_transactions",
         "get_sim_swap_status",
-        "get_customer_profile",
         "get_device_change",
+        "get_customer_profile",
         "get_location_events",
         "get_port_out_status",
         "verify_handoff",
