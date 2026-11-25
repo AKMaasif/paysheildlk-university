@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AppBar, Ico } from "@/components/CustomerChrome";
-import { api, getToken } from "@/lib/api";
+import { api, isSignedIn } from "@/lib/api";
 
 const RULES: [string, (p: string) => boolean][] = [
   ["At least 8 characters", (p) => p.length >= 8],
@@ -23,7 +23,7 @@ function ChangePassword() {
   const [done, setDone] = useState<{ email: string; sms: string } | null>(null);
 
   useEffect(() => {
-    if (!getToken("customer")) router.replace("/c/login");
+    if (!isSignedIn("customer")) router.replace("/c/login");
   }, [router]);
 
   const rulesOk = RULES.every(([, test]) => test(newPw));
