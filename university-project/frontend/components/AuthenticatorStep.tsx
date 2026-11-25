@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
-export type Session = { token: string; refresh_token?: string; user: unknown };
+// The session itself arrives as HttpOnly cookies; the body carries only the person's public details.
+export type Session = { user: unknown };
 
 // The second half of a customer sign-in. After the password the site holds only a short-lived pending token; a session
 // is issued only when the 6-digit code from the customer's authenticator app is right. A customer with no authenticator
