@@ -571,8 +571,8 @@ def map_data(
 @router.get("/api/agents")
 def agents(user: User = Depends(require_operator)):
     settings = runtime.settings
-    configured = settings.gemini_model if settings.gemini_api_key else ("meta:" + settings.meta_model if settings.meta_api_key else "mock-deterministic")
-    fallback = settings.meta_model if settings.meta_api_key else "mock-deterministic"
+    configured = "meta:" + settings.meta_model if settings.meta_api_key else ("grok:" + settings.xai_model if settings.xai_api_key else "mock-deterministic")
+    fallback = "grok:" + settings.xai_model if settings.meta_api_key and settings.xai_api_key else "mock-deterministic"
     with session_scope() as session:
         rows = session.query(CaseEvent).filter(CaseEvent.phase.is_distinct_from("started")).all()  # a start marker is not a finished call
     grouped: dict[str, list[CaseEvent]] = {}
