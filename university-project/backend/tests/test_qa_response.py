@@ -99,10 +99,10 @@ def test_unknown_things_are_reported_not_invented(boot):
 
 def test_provider_counts_add_up(boot):
     ctx, case_id = _tx()
-    for p in ("mock", "mock", "gemini"):
+    for p in ("mock", "mock", "meta"):
         bump_provider(case_id, p)
     with session_scope() as session:
-        assert session.get(Case, case_id).provider_counts == {"mock": 2, "gemini": 1}
+        assert session.get(Case, case_id).provider_counts == {"mock": 2, "meta": 1}
 
 
 # ---------------------------------------------------------------- freeze and lock
