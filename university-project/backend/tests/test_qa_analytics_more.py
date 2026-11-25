@@ -162,10 +162,10 @@ def test_the_figures_are_labelled_simulated_only_when_simulated_payments_are_in_
 
 # ------------------------------------------------------------------ the written brief
 
-def model(monkeypatch, text, provider="gemini", calls=None):
+def model(monkeypatch, text, provider="meta", calls=None):
     import dataclasses
 
-    monkeypatch.setattr(runtime, "settings", dataclasses.replace(runtime.settings, gemini_api_key="test-key"))
+    monkeypatch.setattr(runtime, "settings", dataclasses.replace(runtime.settings, meta_api_key="test-key"))
 
     def complete(**kwargs):
         if calls is not None:
@@ -187,7 +187,7 @@ def test_a_models_wording_is_used_when_every_number_in_it_is_in_the_facts(boot, 
     one_case_book()
     model(monkeypatch, "Of 10 payments in 30 days, 2 looked abnormal.")
     out = compute()
-    assert out["summary_source"] == "gemini" and out["summary"] == "Of 10 payments in 30 days, 2 looked abnormal."
+    assert out["summary_source"] == "meta" and out["summary"] == "Of 10 payments in 30 days, 2 looked abnormal."
 
 
 @pytest.mark.parametrize("reply,why", [
