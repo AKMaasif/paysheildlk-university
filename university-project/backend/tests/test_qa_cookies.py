@@ -88,6 +88,8 @@ def test_secure_cookies_are_the_default_in_production_and_off_in_development(mon
     assert Settings.from_env().cookie_secure is False
     monkeypatch.setenv("APP_ENV", "production")
     assert Settings.from_env().cookie_secure is True
+    monkeypatch.setenv("COOKIE_SECURE", "")  # a Compose file that passes the name through with no value
+    assert Settings.from_env().cookie_secure is True
     monkeypatch.setenv("COOKIE_SECURE", "false")
     assert Settings.from_env().cookie_secure is False
 
