@@ -46,6 +46,14 @@ def fanout(state: CaseState):
     return [Send("telecom", state), Send("banking", state)]
 
 
+def _waited() -> str:
+    """The time the customer was given, in words, from the setting that was actually used."""
+    from app.runtime import runtime
+
+    seconds = int(runtime.settings.escalate_seconds)
+    return f"{seconds} seconds" if seconds < 120 else f"{round(seconds / 60)} minutes"
+
+
 def escalate(state: CaseState) -> dict:
     pace()
     case_id = state["case_id"]
@@ -57,7 +65,7 @@ def escalate(state: CaseState) -> dict:
         message=(
             "The face check could not settle who this is. A human analyst has the case. The transfer stays held."
             if state.get("escalation_reason") == "face"
-            else "No customer response inside 10 minutes. A human analyst has the case. The transfer stays held."
+            else f"No customer response inside {_waited()}. A human analyst has the case. The transfer stays held."
         ),
         handoff_from="alert",
         handoff_to="case",
