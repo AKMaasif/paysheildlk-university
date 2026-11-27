@@ -422,10 +422,12 @@ def test_the_client_cannot_claim_a_pass():
     assert _status(case_id)[0] == "waiting_liveness" and _status(case_id)[2] == "poor_quality"
 
 
-def test_with_no_face_on_file_or_no_engine_a_person_decides():
+def test_with_no_face_on_file_the_scan_is_skipped_and_the_questions_decide():
     case_id = _to_selfie("cus_kumari")  # no face stored for this customer
-    _submit(case_id, ENROLLED)
-    assert _status(case_id)[:2] == ("escalated", "held")
+    status, prompt = _prompt(case_id)
+    assert status == "waiting_verification" and prompt["type"] == "knowledge"
+    with session_scope() as session:
+        assert session.get(Case, case_id).face_verdict == "no_template"
 
 
 def test_if_the_face_engine_is_unavailable_nothing_is_released(monkeypatch):
