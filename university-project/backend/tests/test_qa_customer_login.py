@@ -242,3 +242,19 @@ def test_a_spread_out_guessing_run_against_one_name_still_hits_a_cap(boot):
     with pytest.raises(Exception) as caught:
         ratelimit.check("login_fail_user", "nimal perera")
     assert getattr(caught.value, "status_code", None) == 429
+
+
+def test_the_customer_home_says_how_many_payments_are_waiting(boot):
+    from helpers import sign_in
+
+    from app.agents.runner import begin_case
+    from app.demo import trigger
+
+    with TestClient(app) as client:
+        registered(client)
+        headers = sign_in(client)
+        assert client.get("/api/customer/home", headers=headers).json()["open_cases"] == 0
+        for _ in range(2):
+            begin_case(trigger("cus_nimal", "sim_swap_transfer"))
+        home = client.get("/api/customer/home", headers=headers).json()
+        assert home["open_cases"] == 2 and home["active"]["payee"] == "K.D. Enterprises"
