@@ -465,3 +465,23 @@ def test_resetting_the_demo_sends_no_message_to_anyone(boot, monkeypatch):
     assert sent == []
     with session_scope() as session:
         assert session.query(Notification).count() == 0  # the reset clears them; it creates none
+
+
+def test_reset_puts_back_the_money_a_released_demo_payment_took(boot):
+    from app.demo import reset_demo
+    from app.models import Transaction, User
+
+    case_id = trigger("cus_nimal", "sim_swap_transfer")
+    with session_scope() as session:
+        owner = session.get(User, "cus_nimal")
+        before = owner.balance_lkr
+        tx = session.query(Transaction).filter(Transaction.origin == "demo").first()
+        tx.status = "released"
+        tx.kind = "transfer"
+        amount = tx.amount_lkr
+        owner.balance_lkr = before - amount
+    result = reset_demo()
+    assert result["refunded_lkr"] == amount
+    with session_scope() as session:
+        assert session.get(User, "cus_nimal").balance_lkr == before
+        assert session.get(Case, case_id) is None
