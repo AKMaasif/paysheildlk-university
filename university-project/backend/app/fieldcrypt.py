@@ -1,24 +1,33 @@
 """Start-up checks for the encrypted personal fields."""
 import sqlalchemy as sa
 
-from app.crypto import WeakKeyError, encrypt, open_field, seal_field
+from app.crypto import WeakKeyError, encrypt, seal_field
 
 FIELDS = {"email": "email", "phone": "phone", "nic": "nic", "account_number": "account"}
 USERS = sa.table("users", sa.column("id"), *[sa.column(name) for name in FIELDS])
 
 
 def check_key_matches_data(engine, secret: str) -> None:
-    """If the database already holds encrypted fields, the configured key must open them. A wrong key would otherwise
-    show up later as a failed login or a crash in the middle of a request."""
+    """If the database already holds encrypted values, the configured key must open them. A wrong key would otherwise
+    show up later as a failed login, a missing authenticator code or a crash in the middle of a request. One stored value
+    of every kind is tried: personal fields, authenticator secrets, face data, notification and report text."""
+    from app.rekey import TARGETS, _open
+
     with engine.connect() as connection:
-        for column, purpose in FIELDS.items():
-            value = connection.execute(sa.select(USERS.c[column]).where(USERS.c[column].like("siv1$%")).limit(1)).scalar()
-            if value is not None:
-                try:
-                    open_field(value, secret, purpose)
-                except Exception as exc:
-                    raise WeakKeyError("ENCRYPTION_KEY does not match the key this database was encrypted with. Use the original key; changing it makes stored personal data unreadable.") from exc
-                return
+        for table, column, kind, purpose in TARGETS:
+            t = sa.table(table, sa.column(column))
+            prefix = "siv1$%" if kind == "siv" else "gcm%"
+            value = connection.execute(sa.select(t.c[column]).where(t.c[column].like(prefix)).limit(1)).scalar()
+            if value is None:
+                continue
+            try:
+                _open(kind, value, secret, purpose)
+            except Exception as exc:
+                raise WeakKeyError(
+                    f"ENCRYPTION_KEY does not match the key this database was encrypted with (checked {table}.{column}). "
+                    "Use the original key, or, for demonstration data you can lose, start fresh with `docker compose down -v`. "
+                    "To move to a new key without losing data, use `python -m app.rekey`."
+                ) from exc
 
 
 SIM = sa.table("sim_events", sa.column("id"), sa.column("phone"))
