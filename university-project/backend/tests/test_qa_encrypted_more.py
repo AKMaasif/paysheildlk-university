@@ -189,3 +189,19 @@ def test_a_chunked_upload_under_the_limit_is_untouched(boot):
     with TestClient(app) as client:
         assert client.post("/api/auth/login", content=chunks(), headers={"content-type": "application/json"}).status_code == 200
     assert Path and os  # (kept for the file-level imports used above)
+
+
+def test_the_start_refuses_when_only_an_authenticator_secret_was_written_with_another_key(boot):
+    """An older database upgraded under a new key: the personal fields were encrypted under the new key by the
+    migration, but an older-format authenticator secret still needs the key it was written with."""
+    import hashlib
+
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    nonce = b"\x02" * 12
+    old_key = hashlib.sha256(b"the-key-this-database-was-first-written-with").digest()
+    legacy = "gcm$" + nonce.hex() + "$" + AESGCM(old_key).encrypt(nonce, b"JBSWY3DPEHPK3PXP", b"payshield").hex()
+    with session_scope() as session:
+        session.execute(text("UPDATE users SET totp_secret = :v WHERE totp_secret IS NOT NULL"), {"v": legacy})  # a real mismatch affects every row
+    with pytest.raises(crypto.WeakKeyError, match="users.totp_secret"):
+        init_runtime()
