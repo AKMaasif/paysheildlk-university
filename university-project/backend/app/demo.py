@@ -129,6 +129,14 @@ def reset_demo() -> dict:
             session.query(Report).filter(Report.case_id.in_(case_ids)).delete(synchronize_session=False)
             session.query(Notification).filter(Notification.case_id.in_(case_ids)).delete(synchronize_session=False)
             session.query(Case).filter(Case.id.in_(case_ids)).delete(synchronize_session=False)
+        # A released demonstration payment took money from the (synthetic) account. Removing the payment without giving that
+        # back would leave a balance that no payment explains, so the reset restores it. This is for drills only.
+        refunded = 0
+        for tx in session.query(Transaction).filter(Transaction.origin == "demo", Transaction.status == "released", Transaction.kind == "transfer").all():
+            owner = session.get(User, tx.customer_id)
+            if owner is not None:
+                owner.balance_lkr = int(owner.balance_lkr or 0) + int(tx.amount_lkr or 0)
+                refunded += int(tx.amount_lkr or 0)
         session.query(Transaction).filter(Transaction.origin == "demo").delete(synchronize_session=False)
         session.query(SimEvent).filter(SimEvent.origin == "demo").delete(synchronize_session=False)
         cleared = 0
@@ -141,7 +149,7 @@ def reset_demo() -> dict:
         from app import faults
 
         # Drill payments are origin "demo", so they were removed above. An analyst's own emergency switch stays.
-        return {"cases_removed": len(case_ids), "accounts_cleared": cleared, "faults_cleared": faults.clear_all()}
+        return {"cases_removed": len(case_ids), "accounts_cleared": cleared, "refunded_lkr": refunded, "faults_cleared": faults.clear_all()}
 
 
 @lru_cache(maxsize=64)
