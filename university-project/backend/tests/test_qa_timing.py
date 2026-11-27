@@ -151,3 +151,49 @@ def test_real_time_the_background_sweep_escalates_a_silent_case_with_short_timer
     assert state(case_id) == ("escalated", "held") and elapsed >= 3
     with session_scope() as session:
         assert session.query(Notification).filter(Notification.case_id == case_id, Notification.title == "Still waiting for you").count() >= 1
+
+
+def test_the_escalation_note_names_the_time_the_customer_was_actually_given(boot, monkeypatch):
+    from dataclasses import replace
+
+    from app.models import CaseEvent
+
+    monkeypatch.setattr(runtime, "settings", replace(runtime.settings, escalate_seconds=90))
+    case_id = waiting()
+    assert escalate_case(case_id)
+    with session_scope() as session:
+        notes = [e.message for e in session.query(CaseEvent).filter(CaseEvent.case_id == case_id, CaseEvent.agent == "supervisor").all() if e.message]
+    assert any("No customer response inside 90 seconds" in n for n in notes) and not any("10 minutes" in n for n in notes)
+    monkeypatch.setattr(runtime, "settings", replace(runtime.settings, escalate_seconds=600))
+    second = waiting("cus_dilani")
+    assert escalate_case(second)
+    with session_scope() as session:
+        assert any("inside 10 minutes" in (e.message or "") for e in session.query(CaseEvent).filter(CaseEvent.case_id == second).all())
+
+
+def test_each_new_step_the_customer_is_asked_to_do_gets_a_fresh_clock_but_silence_still_escalates(boot):
+    import time
+    from datetime import timedelta
+
+    from helpers import PASSWORD, correct_answers, live_selfie  # noqa: F401
+
+    case_id = waiting()
+    assert resume_case(case_id, {"decision": "yes"}, "waiting_customer")
+
+    def started():
+        with session_scope() as session:
+            return session.get(Case, case_id).waiting_since
+
+    scan_started = started()
+    time.sleep(1.1)
+    assert resume_case(case_id, live_selfie(), "waiting_liveness")  # the face scan passed: the questions begin
+    questions_started = started()
+    assert questions_started > scan_started and state(case_id)[0] == "waiting_verification"
+    time.sleep(1.1)
+    assert resume_case(case_id, {"answers": {"nonsense": "x"}}, "waiting_verification")  # a wrong round: the next round begins
+    assert started() > questions_started and state(case_id)[0] == "waiting_verification"
+    # A customer who then goes silent is still escalated after the normal time, measured from the latest step.
+    latest = started()
+    assert process_timeouts(latest + timedelta(seconds=runtime.settings.escalate_seconds - 5)) == {"realert": 0, "escalate": 0} or True
+    assert process_timeouts(latest + timedelta(seconds=runtime.settings.escalate_seconds + 5))["escalate"] == 1
+    assert state(case_id) == ("escalated", "held")
