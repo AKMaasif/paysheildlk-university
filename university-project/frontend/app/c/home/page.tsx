@@ -19,6 +19,7 @@ type Prompt = {
 };
 type Home = {
   customer: { full_name: string; bank: string; must_change_password?: boolean };
+  open_cases?: number;
   active: { id: string; status: string; amount_lkr: number; payee: string; pending_prompt: Prompt | null } | null;
   result: { id: string; status: string; amount_lkr: number; payee: string; sim_freeze_ref: string | null; steps: string[] } | null;
   notifications?: { id: string; title: string; body: string; channel: string }[];
@@ -184,6 +185,11 @@ export default function CustomerHome() {
           {error && <div className="cs-error" role="alert">{error}</div>}
 
           {/* A payment waiting for the customer comes first. */}
+          {active && (home?.open_cases || 0) > 1 && (
+            <p className="cs-notice" role="status">
+              You have {home?.open_cases} payments waiting for you. This is the one that changed most recently; the next appears when you have finished it.
+            </p>
+          )}
           {active && prompt?.type === "payment_confirmation" && (
             <section className="cs-panel alert" style={{ marginBottom: 24 }}>
               <span className="tag">Needs you now</span>
