@@ -25,6 +25,7 @@ type ShellContextValue = {
   query: string;
   refreshKey: number;
   refresh: () => void;
+  clearEvents: () => void;
   setDetails: (detail: DetailModel) => void;
   health: Health | null;
   events: LiveEvent[];
@@ -219,6 +220,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       query,
       refreshKey,
       refresh: () => setRefreshKey((n) => n + 1),
+      clearEvents: () => setEvents([]),
       setDetails,
       health,
       events,
