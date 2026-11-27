@@ -59,6 +59,7 @@ MIN_SHARPNESS, MIN_BRIGHT, MAX_BRIGHT, MIN_CONTRAST = 35.0, 55.0, 215.0, 22.0
 FRONTAL_YAW = 0.18  # |yaw ratio| for an identity frame (a hand-held selfie is rarely exactly square on)
 MIN_EAR = 0.15  # eyes at least this open for an identity frame
 
+SCAN_STEPS = ("turn_left", "turn_right")
 STEPS = {
     "turn_left": "Turn your head slowly to your left",
     "turn_right": "Turn your head slowly to your right",
@@ -251,9 +252,10 @@ def _key() -> bytes:
 
 
 def issue_challenge(binding: str, rng: random.Random | None = None) -> dict:
-    """Two different instructions, bound to a case (or "register") and signed with an expiry."""
-    picker = rng or random.SystemRandom()
-    steps = picker.sample(sorted(STEPS), 2) if challenge_required() else []
+    """The same simple scan every time: look straight, turn to the left, then to the right. It is bound to a case (or
+    "register"), signed, short-lived and usable once, so a recording of an earlier scan cannot be replayed. The head
+    movements are still measured from the frames; the fixed order only makes it easy for a person to follow."""
+    steps = list(SCAN_STEPS) if challenge_required() else []
     body = json.dumps({"s": steps, "b": binding, "t": int(time.time()), "n": os.urandom(6).hex()}, separators=(",", ":"))
     packed = base64.urlsafe_b64encode(body.encode()).decode()
     sig = hmac.new(_key(), packed.encode(), hashlib.sha256).hexdigest()
