@@ -7,7 +7,8 @@ def _get(name: str, default: str = "") -> str:
 
 
 def _flag(name: str, default: str = "false") -> bool:
-    return _get(name, default).lower() in {"1", "true", "yes", "on"}
+    # An empty value (for example from a Compose file that passes the name through) means "not set": use the default.
+    return (_get(name) or default).lower() in {"1", "true", "yes", "on"}
 
 
 def _int(name: str, default: int) -> int:
