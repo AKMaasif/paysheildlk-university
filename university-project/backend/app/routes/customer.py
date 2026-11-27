@@ -199,6 +199,7 @@ def customer_home(user: User = Depends(require_customer)):
             (case for case in cases if case.status in {"new", "running", "waiting_customer", "waiting_liveness", "waiting_verification", "escalating"}),
             None,
         )
+        open_count = sum(1 for case in cases if case.status in {"new", "running", "waiting_customer", "waiting_liveness", "waiting_verification", "escalating"})
         latest = cases[0] if cases else None
         focus = active or latest
         fresh = False
@@ -213,6 +214,7 @@ def customer_home(user: User = Depends(require_customer)):
                 "phone": user.phone,
                 "must_change_password": bool(user.must_change_password),
             },
+            "open_cases": open_count,  # how many payments are waiting on this customer, so the page can say so
             "active": None
             if active is None
             else {
