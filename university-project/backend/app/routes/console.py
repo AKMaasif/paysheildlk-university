@@ -87,6 +87,7 @@ def _case_brief(case: Case, customer: User | None) -> dict:
     return {
         "timers": _timers(case),
         "id": case.id,
+        "origin": getattr(case, "origin", "seed"),
         "customer_id": case.customer_id,
         "customer_name": customer.full_name if customer else "",
         "phone": customer.phone if customer else "",
