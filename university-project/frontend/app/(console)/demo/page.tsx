@@ -34,12 +34,13 @@ const LABELS: Record<string, string> = {
 };
 
 export default function DemoPage() {
-  const { refresh } = useShell();
+  const { refresh, clearEvents } = useShell();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [customerId, setCustomerId] = useState("cus_nimal");
   const [scenario, setScenario] = useState("sim_swap_transfer");
   const [assist, setAssist] = useState<Assist | null>(null);
+  const [assistProblem, setAssistProblem] = useState("");
   const [message, setMessage] = useState("");
   const [caseId, setCaseId] = useState("");
   const [error, setError] = useState("");
@@ -54,7 +55,7 @@ export default function DemoPage() {
   useEffect(() => {
     if (!customerId) return;
     let stop = false;
-    const load = () => api<Assist>(`/api/demo/assist?customer_id=${customerId}`).then((body) => { if (!stop) setAssist(body); }).catch(() => { if (!stop) setAssist(null); });
+    const load = () => api<Assist>(`/api/demo/assist?customer_id=${customerId}`).then((body) => { if (!stop) { setAssist(body); setAssistProblem(""); } }).catch((err) => { if (!stop) { setAssist(null); setAssistProblem(err instanceof Error ? err.message : "request failed"); } });
     load();
     const timer = setInterval(load, 1000);
     return () => { stop = true; clearInterval(timer); };
@@ -73,9 +74,11 @@ export default function DemoPage() {
   }
 
   async function reset() {
-    await api("/api/demo/reset", { method: "POST" });
+    const result = await api<{ cases_removed: number; refunded_lkr: number }>("/api/demo/reset", { method: "POST" });
+    clearEvents(); // the live activity page forgets the cases that no longer exist
     setCaseId("");
-    setMessage("Demo cases removed. Seeded history is still here.");
+    const refunded = result?.refunded_lkr ? ` ${result.refunded_lkr.toLocaleString()} LKR from released demo payments was put back.` : "";
+    setMessage("Demo cases removed. Seeded history is still here." + refunded);
     refresh();
   }
 
@@ -95,7 +98,7 @@ export default function DemoPage() {
       <PageHeader crumb="Demo / Controls" title="Demo controls" subtitle="Raise a SIM swap and a payment, then watch the desk." chip="PILOT" />
       <Note>This writes a SIM event and a payment into the mock feeds, then starts the same graph a live feed would start. Reset removes only rows tagged as demo.</Note>
       {error && <Note tone="warn">{error}</Note>}
-      {message && <Note>{message} {caseId && <Link href="/live">Open live activity</Link>}</Note>}
+      {message && <Note>{message} {caseId && <Link href={`/live?case=${encodeURIComponent(caseId)}`}>Watch it live</Link>}</Note>}
       <div className="split">
         <div className="card">
           <h2>Scenario</h2>
@@ -175,7 +178,7 @@ export default function DemoPage() {
                 </button>
               )}
             </div>
-          ) : <p className="quiet">Assist is off or the customer is missing.</p>}
+          ) : <p className="quiet">{assistProblem ? `Could not load this customer's details: ${assistProblem}. If it says Internal Server Error, look at the backend log (docker compose logs backend).` : "Loading the customer's details, or demo assist is off (DEMO_ASSIST=true turns it on)."}</p>}
           <p className="fine">Customer site: open /c on this host, or on a phone that can reach this machine.</p>
         </div>
       </div>
