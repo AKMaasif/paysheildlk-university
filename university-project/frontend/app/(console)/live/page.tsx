@@ -12,6 +12,7 @@ import { nodeFor } from "@/lib/terminal";
 type CaseRow = {
   id: string;
   customer_name: string;
+  origin?: string;
   status: string;
   amount_lkr: number;
   payee: string;
@@ -52,12 +53,15 @@ export default function LivePage() {
   }, [refreshKey, events.length]);
 
   useEffect(() => {
-    const waiting = cases.find((item) => item.status === "waiting_customer" || item.status === "waiting_verification");
+    // After a reset only sample history is left. Prefer a case from the drill in progress: one waiting for the
+    // customer, otherwise the newest demo case. With none, show an empty state rather than somebody else's case.
+    const demo = cases.filter((item) => item.origin === "demo");
+    const waiting = demo.find((item) => item.status.startsWith("waiting_")) || demo[0];
     // A link such as /live?case=PS-26-00050 opens that case.
     const asked = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("case") || "";
     setCaseId((current) => {
       if (asked && cases.some((item) => item.id === asked) && current !== asked && !current) return asked;
-      return current && cases.some((item) => item.id === current) ? current : (cases.some((item) => item.id === asked) ? asked : (waiting || cases[0])?.id || "");
+      return current && cases.some((item) => item.id === current) ? current : (cases.some((item) => item.id === asked) ? asked : waiting?.id || "");
     });
   }, [cases]);
 
@@ -117,10 +121,17 @@ export default function LivePage() {
         extra={
           <label className="saved">Case
             <select value={caseId} onChange={(event) => setCaseId(event.target.value)}>
-              {cases.length === 0 && <option value="">No cases</option>}
-              {cases.map((item) => (
-                <option key={item.id} value={item.id}>{item.id} · {item.customer_name}</option>
-              ))}
+              <option value="">{cases.some((item) => item.origin === "demo") ? "Choose a case" : "No demo case yet"}</option>
+              <optgroup label="Demo cases">
+                {cases.filter((item) => item.origin === "demo").map((item) => (
+                  <option key={item.id} value={item.id}>{item.id} · {item.customer_name}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Sample history">
+                {cases.filter((item) => item.origin !== "demo").map((item) => (
+                  <option key={item.id} value={item.id}>{item.id} · {item.customer_name}</option>
+                ))}
+              </optgroup>
             </select>
           </label>
         }
