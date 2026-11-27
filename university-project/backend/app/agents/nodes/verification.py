@@ -12,6 +12,15 @@ from app.util import utcnow
 log = logging.getLogger("payshield.graph")
 
 
+def _fresh_clock() -> dict:
+    """Each new step the customer is asked to do (the next question round, a retake, the questions after the face scan)
+    gets its own full allowance of time. Someone who is actively working through the steps is not escalated halfway.
+    This cannot be used to stall: there are at most two selfie tries and four question rounds, and each step is still
+    timed, so a customer who stops answering is escalated after the normal time."""
+    now = utcnow()
+    return {"waiting_since": now, "last_alert_at": now}
+
+
 def _round_prompt(customer_id: str, round_no: int, avoid: list | None = None) -> dict:
     from app.knowledge import draw_round
 
@@ -42,6 +51,23 @@ def verification_prep(state: CaseState) -> dict:
     if order.get("customer_decision") != "yes":
         raise PermissionError("verification only starts on a signed yes")
     now = utcnow()
+    from app.db import session_scope
+    from app.models import User
+
+    with session_scope() as session:
+        owner = session.get(User, state["customer_id"])
+        sealed = owner.face_ref if owner else None
+    from app import face
+
+    templates = face.load_templates(sealed) if (sealed and face.mode() == "dlib") else None
+    has_face = bool(templates and templates.get("embeddings")) or face.mode() != "dlib"
+    if not has_face:
+        # Nobody can be matched against a face that was never enrolled (for example an account that has not been
+        # through registration). The scan is skipped, not passed: the full four rounds of security questions decide.
+        prompt = _round_prompt(state["customer_id"], 1)
+        set_case_fields(case_id, status="waiting_verification", customer_decision="yes", knowledge_round=1, liveness_strikes=0, pending_prompt=prompt["public"], face_verdict="no_template", **_fresh_clock())
+        emit(case_id, agent="verification", state="waiting_for_customer", message="No usable face is on file for this account, so the face scan is skipped. Four rounds of security questions decide instead.", handoff_from="customer", handoff_to="verification")
+        return {"customer_decision": "yes", "step": "knowledge", "knowledge_round": 1, "max_rounds": 4, "liveness_strikes": 0, "face_verdict": "no_template", "_stored": prompt["asked"], "asked_before": list(prompt["asked"])}
     prompt = _liveness_prompt(case_id)
     set_case_fields(
         case_id,
@@ -101,11 +127,11 @@ def verify_wait(state: CaseState) -> dict:
             if strikes >= 2:
                 set_case_fields(case_id, liveness_strikes=strikes, verification_passed=False, verification_detail="Live selfie failed twice.", pending_prompt=None)
                 return {"verification_passed": False, "step": "failed", "liveness_strikes": strikes, "customer_decision": "yes", "timed_out": False, **_send(case_id, "verify_wait", "response", {"verified": False, "reason": "selfie"})}
-            set_case_fields(case_id, liveness_strikes=strikes, status="waiting_liveness", pending_prompt={"type": "liveness", "retake": True})
+            set_case_fields(case_id, liveness_strikes=strikes, status="waiting_liveness", pending_prompt={"type": "liveness", "retake": True}, **_fresh_clock())
             emit(case_id, agent="verification", state="waiting_for_customer", message="Selfie did not look live. One retake is allowed.")
             return {"step": "liveness", "liveness_strikes": strikes, "customer_decision": "yes", "timed_out": False}
         prompt = _round_prompt(state["customer_id"], 1)
-        set_case_fields(case_id, status="waiting_verification", liveness_strikes=strikes, knowledge_round=1, pending_prompt=prompt["public"])
+        set_case_fields(case_id, status="waiting_verification", liveness_strikes=strikes, knowledge_round=1, pending_prompt=prompt["public"], **_fresh_clock())
         return {"step": "knowledge", "knowledge_round": 1, "liveness_strikes": strikes, "customer_decision": "yes", "timed_out": False, "_stored": prompt["asked"], "asked_before": list(prompt["asked"])}
     # Grade every question shown in this round, not only the ones the client chose to answer.
     shown = state.get("_stored") or tools.customer_questions(state["customer_id"])
@@ -129,7 +155,7 @@ def verify_wait(state: CaseState) -> dict:
     nxt = round_no + 1
     earlier = list(state.get("asked_before") or [])
     prompt = _round_prompt(state["customer_id"], nxt, avoid=earlier)
-    set_case_fields(case_id, status="waiting_verification", knowledge_round=nxt, pending_prompt=prompt["public"])
+    set_case_fields(case_id, status="waiting_verification", knowledge_round=nxt, pending_prompt=prompt["public"], **_fresh_clock())
     emit(case_id, agent="verification", state="waiting_for_customer", message="Let's try another set.")
     return {"step": "knowledge", "knowledge_round": nxt, "customer_decision": "yes", "timed_out": False, "_stored": prompt["asked"], "asked_before": earlier + list(prompt["asked"])}
 
@@ -158,7 +184,7 @@ def _face_step(state: CaseState, payload: dict) -> dict:
         agent="verification",
         state="calling_tool",
         tool_name="liveness_check",
-        tool_args={"frames": len(payload.get("frames") or []), "challenge": (live.get("challenge") or {})},
+        tool_args={"frames": len(payload.get("frames") or []), "challenge": ", ".join(str(x) for x in ((live.get("challenge") or {}).get("steps") or (live.get("challenge") or {}).get("order") or [])) or "random head turns"},
         result_summary=("live person, challenge followed" if live.get("live") else ("not accepted as live: " + "; ".join(result.hints[:2])) if result.verdict == "fake" else "not assessed")
         if result.verdict not in {"unavailable", "no_template"}
         else result.hints[0],
@@ -182,7 +208,7 @@ def _face_step(state: CaseState, payload: dict) -> dict:
     nxt = decision["next"]
     if nxt == "questions":
         prompt = _round_prompt(customer_id, 1)
-        set_case_fields(case_id, status="waiting_verification", knowledge_round=1, pending_prompt=prompt["public"], liveness_strikes=carry.get("liveness_strikes", state.get("liveness_strikes") or 0))
+        set_case_fields(case_id, status="waiting_verification", knowledge_round=1, pending_prompt=prompt["public"], liveness_strikes=carry.get("liveness_strikes", state.get("liveness_strikes") or 0), **_fresh_clock())
         emit(case_id, agent="verification", state="waiting_for_customer", message=("Face matched. Now the security questions." if result.verdict == "match" else "Face likely matched. Two rounds of security questions will decide."))
         out = {**base, "step": "knowledge", "knowledge_round": 1, "max_rounds": decision["max_rounds"], "face_score": result.score or 0.0, "_stored": prompt["asked"], "asked_before": list(prompt["asked"])}
         if result.embedding and (result.score or 0) >= face.REFRESH_SCORE and result.verdict == "match":
@@ -194,7 +220,7 @@ def _face_step(state: CaseState, payload: dict) -> dict:
             "uncertain": "We could not be sure it is you. Face the camera in good light, with your face fully in view, and try again.",
         }.get(result.verdict, "Please try again.")
         hints = result.hints or [default]
-        set_case_fields(case_id, status="waiting_liveness", pending_prompt=_liveness_prompt(case_id, retake=True, hints=hints))
+        set_case_fields(case_id, status="waiting_liveness", pending_prompt=_liveness_prompt(case_id, retake=True, hints=hints), **_fresh_clock())
         emit(case_id, agent="verification", state="waiting_for_customer", message="Another face scan is needed. " + hints[0])
         return {**base, "step": "liveness"}
     if nxt == "block":
