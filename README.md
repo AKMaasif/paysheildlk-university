@@ -20,7 +20,7 @@
 [![Coverage](https://img.shields.io/badge/Line_coverage-93.5%25-2EA44F?style=for-the-badge&labelColor=555555)](#qa-test-results)
 [![Pilot](https://img.shields.io/badge/Status-Pilot_with_synthetic_data-B23B3B?style=for-the-badge&labelColor=555555)](#policies-and-limitations)
 
-[Demo video](https://www.youtube.com/watch?v=X6d-3UrnCWA) · [Live demo](#live-demo-and-how-it-is-served) · [See it work](#see-it-work) · [Features](#features) · [Agentic architecture](#agentic-architecture) · [Agent rules](#what-each-agent-may-and-may-not-do) · [Security](#security-controls) · [AI assistance](#ai-assistance) · [Benchmarks](#benchmark-results) · [QA](#qa-test-results) · [Business value](#business-value) · [Impact](#impact) · [Run it](#run-it)
+[User manual (PDF)](university-project/docs/user-manual/PayShield-User-Manual.pdf) · [Demo video](https://www.youtube.com/watch?v=X6d-3UrnCWA) · [Live demo](#live-demo-and-how-it-is-served) · [See it work](#see-it-work) · [Features](#features) · [Agentic architecture](#agentic-architecture) · [Agent rules](#what-each-agent-may-and-may-not-do) · [Security](#security-controls) · [AI assistance](#ai-assistance) · [Benchmarks](#benchmark-results) · [QA](#qa-test-results) · [Business value](#business-value) · [Impact](#impact) · [Run it](#run-it)
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=X6d-3UrnCWA"><img src="https://img.youtube.com/vi/X6d-3UrnCWA/hqdefault.jpg" alt="Watch the PayShield.lk demo video on YouTube" width="480"></a>
@@ -398,6 +398,7 @@ cd e2e && npm test
 
 | Document | What it covers |
 |---|---|
+| [`docs/user-manual/PayShield-User-Manual.pdf`](university-project/docs/user-manual/PayShield-User-Manual.pdf) | **User manual** (PDF, 28 pages): install, customer guide, fraud desk guide, demo, sharing, security, testing, troubleshooting |
 | [`docs/LOCAL_TESTING.md`](university-project/docs/LOCAL_TESTING.md) | Run and test on your own PC |
 | [`docs/SHARE_ONLINE.md`](university-project/docs/SHARE_ONLINE.md) | Share the customer view through a tunnel |
 | [`docs/DEMO_GUIDE.md`](university-project/docs/DEMO_GUIDE.md) | Demo script and what to set |
