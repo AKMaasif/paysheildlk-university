@@ -137,7 +137,7 @@ class _Doc(FPDF):
             self.set_y(8)
             self.set_font("Helvetica", "", 8)
             self.set_text_color(*MUTED)
-            self.cell(0, 4, _latin(f"{self._title}  |  {self._reference}"), align="R")
+            self.cell(0, 4, _latin(f"{self._title}  |  {self._reference}" if self._reference else self._title), align="R")
             self.ln(8)
 
     def footer(self) -> None:
@@ -346,7 +346,9 @@ def _customer_steps(case: Case, restricted: bool) -> list[str]:
     return steps
 
 
-def build_case_pdf(case_id: str, audience: str = "analyst") -> bytes:
+def build_case_pdf(case_id: str, audience: str = "analyst", show_case_line: bool = True) -> bytes:
+    """show_case_line=False leaves the case number and filing time off the title block and the page header (used for the
+    sample reports in docs/samples)."""
     if audience not in {"analyst", "customer"}:
         raise ValueError("audience must be analyst or customer")
     customer = audience == "customer"
@@ -368,7 +370,7 @@ def build_case_pdf(case_id: str, audience: str = "analyst") -> bytes:
 
     created = cutoff or aware(case.updated_at)
     title = "Payment receipt" if customer else "Incident report"
-    doc = _Doc(f"PayShield {title.lower()}", case.id, created)
+    doc = _Doc(f"PayShield {title.lower()}", case.id if show_case_line else "", created)
     doc.add_page()
 
     # Title block
@@ -379,7 +381,8 @@ def build_case_pdf(case_id: str, audience: str = "analyst") -> bytes:
     doc.cell(0, 9, title, new_x="LMARGIN", new_y="NEXT")
     doc.set_font("Helvetica", "", 9)
     doc.set_text_color(*MUTED)
-    doc.cell(0, 5, _latin(f"Case {case.id}  |  Filed {_clock(created)} Asia/Colombo"), new_x="LMARGIN", new_y="NEXT")
+    if show_case_line:
+        doc.cell(0, 5, _latin(f"Case {case.id}  |  Filed {_clock(created)} Asia/Colombo"), new_x="LMARGIN", new_y="NEXT")
     doc.ln(4)
 
     payee = case.payee or (tx.payee if tx else "")
