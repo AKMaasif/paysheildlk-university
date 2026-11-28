@@ -20,7 +20,12 @@
 [![Coverage](https://img.shields.io/badge/Line_coverage-93.5%25-2EA44F?style=for-the-badge&labelColor=555555)](#qa-test-results)
 [![Pilot](https://img.shields.io/badge/Status-Pilot_with_synthetic_data-B23B3B?style=for-the-badge&labelColor=555555)](#policies-and-limitations)
 
-[Live demo](#live-demo-and-how-it-is-served) · [See it work](#see-it-work) · [Features](#features) · [Agentic architecture](#agentic-architecture) · [Agent rules](#what-each-agent-may-and-may-not-do) · [Security](#security-controls) · [AI assistance](#ai-assistance) · [Benchmarks](#benchmark-results) · [QA](#qa-test-results) · [Business value](#business-value) · [Impact](#impact) · [Run it](#run-it)
+[Demo video](https://www.youtube.com/watch?v=X6d-3UrnCWA) · [Live demo](#live-demo-and-how-it-is-served) · [See it work](#see-it-work) · [Features](#features) · [Agentic architecture](#agentic-architecture) · [Agent rules](#what-each-agent-may-and-may-not-do) · [Security](#security-controls) · [AI assistance](#ai-assistance) · [Benchmarks](#benchmark-results) · [QA](#qa-test-results) · [Business value](#business-value) · [Impact](#impact) · [Run it](#run-it)
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=X6d-3UrnCWA"><img src="https://img.youtube.com/vi/X6d-3UrnCWA/hqdefault.jpg" alt="Watch the PayShield.lk demo video on YouTube" width="480"></a>
+  <br><b><a href="https://www.youtube.com/watch?v=X6d-3UrnCWA">&#9654; Watch the demo video on YouTube</a></b>
+</p>
 
 > [!IMPORTANT]
 > **Independent pilot. Not a bank product and not approved by any regulator.** Every person, balance and payment in the demo
