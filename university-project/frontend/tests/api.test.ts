@@ -3,7 +3,7 @@ import test, { beforeEach } from "node:test";
 
 // A small stand-in for the browser: storage, a location, and a fetch whose answers each test chooses.
 const store = new Map<string, string>();
-const location = { pathname: "/c/home", href: "/c/home", protocol: "http:", hostname: "example.test" };
+const location = { pathname: "/c/home", href: "/c/home", protocol: "http:", hostname: "example.test", host: "example.test" };
 (globalThis as any).localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) };
 (globalThis as any).window = { location };
 const calls: { url: string; headers: Headers; body?: unknown }[] = [];
@@ -178,7 +178,8 @@ test("the live-stream address names the portal and carries no token", () => {
   assert.equal(api.wsUrl("customer"), "ws://example.test:8000/ws?portal=customer");
   location.protocol = "https:";
   process.env.NEXT_PUBLIC_WS_PORT = "9000";
-  assert.equal(api.wsUrl("operator"), "wss://example.test:9000/ws?portal=operator");
+  // Over https the stream shares the site's own address; the proxy in front forwards /ws to the backend.
+  assert.equal(api.wsUrl("operator"), "wss://example.test/ws?portal=operator");
   process.env.NEXT_PUBLIC_WS_URL = "wss://stream.example/ws";
   assert.equal(api.wsUrl("operator"), "wss://stream.example/ws?portal=operator");
   process.env.NEXT_PUBLIC_WS_URL = "wss://stream.example/ws?room=1";
