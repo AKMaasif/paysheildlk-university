@@ -86,6 +86,19 @@ The same stack also runs fully local at `http://localhost:3000` (fraud desk cons
 > The fraud desk console (live agent activity, cases, on-hold payments, reports, analytics map, simulate and demo controls)
 > is described in [`docs/DEMO_GUIDE.md`](university-project/docs/DEMO_GUIDE.md).
 
+## Sample inputs, outputs and reports
+
+Four worked runs from the real workflow are in [`docs/samples/`](university-project/docs/samples/README.md): the input
+(telecom feed, bank feed, payment, customer answers), the output (score, factors, rule decision, statuses, messages,
+timeline) as JSON, and the **incident report PDF** for each case.
+
+| Sample | Result | Files |
+|---|---|---|
+| Hold, then verified release (Rs. 200,000) | hold, then released | [JSON](university-project/docs/samples/01-hold-then-verified-release.json) · [PDF](university-project/docs/samples/01-hold-then-verified-release-incident-report.pdf) |
+| Hold, then the customer denies | hold, then blocked | [JSON](university-project/docs/samples/02-hold-then-customer-denies-block.json) · [PDF](university-project/docs/samples/02-hold-then-customer-denies-block-incident-report.pdf) |
+| Port-out critical (Rs. 800,000) | blocked at once | [JSON](university-project/docs/samples/03-port-out-critical-block.json) · [PDF](university-project/docs/samples/03-port-out-critical-block-incident-report.pdf) |
+| Routine bill (Rs. 4,850) | released by the rules | [JSON](university-project/docs/samples/04-routine-payment-release.json) · [PDF](university-project/docs/samples/04-routine-payment-release-incident-report.pdf) |
+
 ## Features
 
 **Fraud desk (operators and analysts)**
