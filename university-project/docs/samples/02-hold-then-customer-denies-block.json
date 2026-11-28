@@ -1,0 +1,593 @@
+{
+  "input": {
+    "customer": {
+      "id": "cus_nimal",
+      "name": "Nimal Perera",
+      "bank": "BankCylone",
+      "phone": "*********183"
+    },
+    "telecom_feed": [
+      {
+        "event": "sim_swap",
+        "at": "2026-11-28 14:04:21 UTC",
+        "detail": {
+          "channel": "ussd",
+          "previous_imsi_suffix": "4412",
+          "new_imsi_suffix": "9081"
+        }
+      },
+      {
+        "event": "new_imei",
+        "at": "2026-11-28 14:05:21 UTC",
+        "detail": {
+          "imei_masked": "35693810....441",
+          "model": "Samsung Galaxy A15"
+        }
+      },
+      {
+        "event": "location_change",
+        "at": "2026-11-28 14:09:21 UTC",
+        "detail": {
+          "from": "Colombo",
+          "to": "Negombo"
+        }
+      },
+      {
+        "event": "sim_freeze",
+        "at": "2026-11-28 14:29:21 UTC",
+        "detail": {
+          "reference": "FRZ-98A89625",
+          "reason": "Customer said they did not make this payment.",
+          "status": "request_recorded_simulated",
+          "operator_contacted": false
+        }
+      }
+    ],
+    "bank_feed_before_the_payment": [
+      {
+        "kind": "login",
+        "payee": null,
+        "new_payee": false,
+        "at": "2026-11-28 13:59:21 UTC"
+      },
+      {
+        "kind": "new_payee",
+        "payee": "K.D. Enterprises",
+        "new_payee": true,
+        "at": "2026-11-28 14:17:21 UTC"
+      }
+    ],
+    "payment": {
+      "id": "TX-05FBF3",
+      "amount_lkr": 200000,
+      "payee": "K.D. Enterprises",
+      "new_payee": true,
+      "status_when_it_arrived": "pending"
+    },
+    "customer_responses": [
+      {
+        "step": "payment question",
+        "answer": "No, this was not me"
+      }
+    ]
+  },
+  "output": {
+    "case_id": "PS-26-00046",
+    "risk_score": 100,
+    "risk_factors": [
+      {
+        "code": "sim_swap_24h",
+        "label": "SIM swap within 24 hours",
+        "points": 40
+      },
+      {
+        "code": "new_imei",
+        "label": "New handset (IMEI) in the last 72 hours",
+        "points": 15
+      },
+      {
+        "code": "location",
+        "label": "Serving location changed in the last 48 hours (Negombo)",
+        "points": 10
+      },
+      {
+        "code": "new_payee",
+        "label": "Payee was added recently",
+        "points": 15
+      },
+      {
+        "code": "amount_100k",
+        "label": "Transfer is at least Rs. 100,000",
+        "points": 20
+      },
+      {
+        "code": "new_device_login",
+        "label": "Sign-in from a device not seen on this account",
+        "points": 10
+      }
+    ],
+    "policy_decision": "hold",
+    "policy_reason": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
+    "case_status": "closed_blocked",
+    "payment_status": "blocked",
+    "notifications": [
+      {
+        "channel": "push",
+        "title": "Confirm a payment"
+      },
+      {
+        "channel": "email",
+        "title": "Confirm a payment in PayShield"
+      },
+      {
+        "channel": "sms",
+        "title": "SMS"
+      },
+      {
+        "channel": "push",
+        "title": "Payment blocked"
+      },
+      {
+        "channel": "email",
+        "title": "Payment blocked"
+      },
+      {
+        "channel": "email",
+        "title": "Your PayShield receipt PS-26-00046"
+      },
+      {
+        "channel": "sms",
+        "title": "SMS"
+      },
+      {
+        "channel": "push",
+        "title": "Your receipt is ready"
+      }
+    ],
+    "timeline": [
+      {
+        "t_plus_s": 0.0,
+        "agent": "supervisor",
+        "message": "Opening the case and assigning the two feeds.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "supervisor",
+        "message": null,
+        "tool": "create_case"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "supervisor",
+        "message": null,
+        "tool": "create_case"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "supervisor",
+        "message": "Telecom and banking look at the same case in parallel. The route is fixed.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "supervisor",
+        "message": "Banking agent assigned.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "telecom",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": "Reading recent account activity.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "telecom",
+        "message": "Reading the SIM profile for this number.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": null,
+        "tool": "get_recent_transactions"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_sim_swap_status"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": null,
+        "tool": "get_recent_transactions"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": "Looking further: A payment is waiting, so compare it with what is usual for this customer.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_sim_swap_status"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": null,
+        "tool": "get_customer_profile"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_device_change"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": null,
+        "tool": "get_customer_profile"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_device_change"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "banking",
+        "message": "Looking further: The payee is new, so check whether this account ever paid them before.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_location_events"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "banking",
+        "message": null,
+        "tool": "get_payee_history"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_location_events"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "banking",
+        "message": null,
+        "tool": "get_payee_history"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_port_out_status"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "banking",
+        "message": "Looking further: Sign-in or password events are on the ledger, so read them.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "banking",
+        "message": null,
+        "tool": "get_credential_events"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_port_out_status"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": "Looking further: The SIM was swapped, so look for other recent SIM events on this number.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_sim_history"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "banking",
+        "message": null,
+        "tool": "get_credential_events"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_sim_history"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "banking",
+        "message": "The account activity includes a payee that was added recently and a transfer to that payee. Amounts below are the ledger figures.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": "The operator feed records a SIM change close to this payment, and the handset and location lines are the ones returned by the tools. This note only restates the feed.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "risk",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "risk",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "risk",
+        "message": "Adding the telecom and bank signals.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "risk",
+        "message": null,
+        "tool": "compute_risk_score"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "risk",
+        "message": null,
+        "tool": "compute_risk_score"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "risk",
+        "message": "The score is the sum of the factor table from the rule definitions, capped at 100. It is an input to the rule layer, which makes the hold, block, or release decision.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "policy",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "policy",
+        "message": "Applying the hold, block, and release rules. This step does not call a model.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "policy",
+        "message": null,
+        "tool": "compute_risk_score"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "policy",
+        "message": null,
+        "tool": "hold_transaction"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "policy",
+        "message": null,
+        "tool": "hold_transaction"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "policy",
+        "message": "Rule: the transfer is suspicious next to a recent SIM change, so the money stays held until the customer answers on their registered device.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "alert",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "alert",
+        "message": "Telling the customer on the registered device.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "alert",
+        "message": null,
+        "tool": "send_push"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "alert",
+        "message": null,
+        "tool": "send_email"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "alert",
+        "message": null,
+        "tool": "send_sms"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "alert",
+        "message": null,
+        "tool": "send_push"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "alert",
+        "message": null,
+        "tool": "send_email"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "alert",
+        "message": null,
+        "tool": "send_sms"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "alert",
+        "message": "The customer is being asked on the registered device whether they made this payment. The SMS is a generic warning with no code and no link.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "alert",
+        "message": "Waiting for the customer on the registered device.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "response",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "response",
+        "message": "Blocking the transfer and recording a SIM freeze request (simulated: no operator is contacted).",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "response",
+        "message": null,
+        "tool": "block_transaction"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "response",
+        "message": null,
+        "tool": "block_transaction"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "response",
+        "message": null,
+        "tool": "request_sim_freeze"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "response",
+        "message": null,
+        "tool": "request_sim_freeze"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "response",
+        "message": null,
+        "tool": "lock_account"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "response",
+        "message": null,
+        "tool": "lock_account"
+      },
+      {
+        "t_plus_s": 0.3,
+        "agent": "response",
+        "message": "The protective actions are a block on the transfer, a recorded SIM freeze request (not yet sent to the operator), and limits on the account. The case file records each one.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.3,
+        "agent": "case",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.3,
+        "agent": "case",
+        "message": "Writing the incident report.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.3,
+        "agent": "case",
+        "message": null,
+        "tool": "review_notes"
+      },
+      {
+        "t_plus_s": 0.3,
+        "agent": "case",
+        "message": null,
+        "tool": "review_notes"
+      },
+      {
+        "t_plus_s": 0.3,
+        "agent": "case",
+        "message": null,
+        "tool": "generate_report"
+      },
+      {
+        "t_plus_s": 0.4,
+        "agent": "case",
+        "message": null,
+        "tool": "generate_report"
+      },
+      {
+        "t_plus_s": 0.4,
+        "agent": "case",
+        "message": null,
+        "tool": "deliver_report"
+      },
+      {
+        "t_plus_s": 0.4,
+        "agent": "case",
+        "message": null,
+        "tool": "deliver_report"
+      },
+      {
+        "t_plus_s": 0.4,
+        "agent": "case",
+        "message": "The incident report lists the feeds, the rule decision, the customer answer, and the actions. It is the record a fraud desk would keep.",
+        "tool": null
+      }
+    ],
+    "report": {
+      "title": "Incident report PS-26-00046",
+      "sha256_of_pdf": "fd7d710f14cac5ba25cd467671d50922a451ab0a7b737c34fe6715fe1b551955"
+    }
+  },
+  "scenario": "sim_swap_transfer"
+}
