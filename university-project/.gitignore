@@ -18,3 +18,7 @@ data/
 .coverage
 .coverage.*
 htmlcov/
+
+# Personal notes and local logs
+run comment.txt
+backend-log.txt
