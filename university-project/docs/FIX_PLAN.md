@@ -1,6 +1,6 @@
 # Fix plan for the 15 review findings
 
-Each finding was checked against the code on branch `claude/nifty-mendel-serxgl` (commit `7a5166a`) before planning. "Confirmed" means the code does what the finding says. **Status:** all 15 findings are now addressed (see `docs/STATUS.md` for the details and what remains open). The plan below is kept as it was written.
+Each finding was checked against the code at commit `7a5166a` before planning. "Confirmed" means the code does what the finding says. **Status:** all 15 findings are now addressed (see `docs/STATUS.md` for the details and what remains open). The plan below is kept as it was written.
 
 ## Verification result
 

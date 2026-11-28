@@ -13,7 +13,7 @@ The people and money in the demo are fictional.
 ## 2. Get the code
 
 ```bash
-git clone -b claude/nifty-mendel-serxgl https://github.com/AKMaasif/sim-swap-shield.git
+git clone https://github.com/AKMaasif/sim-swap-shield.git
 cd sim-swap-shield/university-project
 ```
 

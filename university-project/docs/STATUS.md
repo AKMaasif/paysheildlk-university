@@ -1,6 +1,6 @@
 # Status: what is done, what is left, how to run it
 
-Branch `claude/nifty-mendel-serxgl`. Everything below was checked against the code and the test runs described in
+Everything below was checked against the code and the test runs described in
 `docs/TEST_REPORT.md` section 0.
 
 ## What the system does
@@ -53,7 +53,7 @@ Real SMS (Text.lk key and your number), real email (SMTP and your address), web 
 ## Set up and run
 
 ```bash
-git clone -b claude/nifty-mendel-serxgl https://github.com/AKMaasif/sim-swap-shield.git
+git clone https://github.com/AKMaasif/sim-swap-shield.git
 cd sim-swap-shield/university-project
 cp .env.example .env        # set ENCRYPTION_KEY to 32+ characters (openssl rand -hex 32) before real use
 docker compose up --build   # console and customer site at http://localhost:3000
