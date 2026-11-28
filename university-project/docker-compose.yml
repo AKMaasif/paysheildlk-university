@@ -101,5 +101,19 @@ services:
     depends_on:
       - backend
 
+  # Optional: one front door for sharing the demo over the internet. It sends /ws to the backend and everything else to
+  # the website, so a single tunnel to port 8080 is enough. Start it with: docker compose --profile share up -d
+  share:
+    image: caddy:2.8-alpine
+    profiles: ["share"]
+    restart: unless-stopped
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      - frontend
+      - backend
+
 volumes:
   pgdata:
