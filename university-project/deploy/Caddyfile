@@ -1,0 +1,14 @@
+# One address for the demo. The tunnel points at port 8080 and handles https; this file only routes.
+{
+	auto_https off
+	admin off
+}
+
+:8080 {
+	# Live updates (WebSocket) go to the backend.
+	@stream path /ws /ws/*
+	reverse_proxy @stream backend:8000
+
+	# The website, including its /backend/* proxy to the API.
+	reverse_proxy frontend:3000
+}
