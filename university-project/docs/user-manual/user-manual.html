@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PayShield.lk User Manual</title>
+<style>
+  @page { size: A4; margin: 15mm 16mm 18mm;
+    @bottom-left { content: "PayShield.lk User Manual · Team Spikers, University of Ruhuna"; font: 8pt "Segoe UI", Arial, sans-serif; color: #6b7b7e; }
+    @bottom-right { content: "Page " counter(page); font: 8pt "Segoe UI", Arial, sans-serif; color: #6b7b7e; } }
+  @page full { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
+  :root {
+    --teal: #0f6b6b; --teal-d: #0a3d46; --teal-l: #e6f1f0; --ink: #14272b; --muted: #5b6b6e;
+    --line: #dbe4e3; --amber: #b7791f; --amber-l: #fdf3df; --red: #b23b3b; --red-l: #fbeaea; --green: #1f7a4d; --green-l: #e7f5ee;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: var(--ink); font-size: 9.8pt; line-height: 1.45; }
+  .page { position: relative; }
+  .page.cover, .page.back { page: full; width: 210mm; height: 297mm; break-after: page; }
+  .page.back { break-after: auto; }
+
+  /* cover */
+  .cover { padding: 0; background: linear-gradient(155deg, #072f36 0%, #0a3d46 45%, #0f6b6b 100%); color: #fff; height: 297mm; overflow: hidden; }
+  .cover .glow { position: absolute; right: -40mm; top: -30mm; width: 150mm; height: 150mm; border-radius: 50%; background: radial-gradient(circle, rgba(94,234,212,.28), rgba(94,234,212,0) 70%); }
+  .cover .glow2 { position: absolute; left: -50mm; bottom: -50mm; width: 140mm; height: 140mm; border-radius: 50%; background: radial-gradient(circle, rgba(94,234,212,.16), rgba(94,234,212,0) 70%); }
+  .cover .inner { position: relative; padding: 24mm 20mm; height: 100%; display: flex; flex-direction: column; }
+  .cover img.logo { width: 78mm; mix-blend-mode: lighten; }
+  .cover .kicker { margin-top: 38mm; letter-spacing: .22em; text-transform: uppercase; font-size: 9.5pt; color: #8fe7d6; font-weight: 600; }
+  .cover h1 { font-size: 44pt; line-height: 1.05; margin: 6mm 0 4mm; font-weight: 700; letter-spacing: -.01em; }
+  .cover .sub { font-size: 14pt; max-width: 130mm; color: #cfe9e6; }
+  .cover .meta { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 6mm 10mm; border-top: 1px solid rgba(255,255,255,.25); padding-top: 8mm; font-size: 10pt; }
+  .cover .meta b { display: block; font-size: 8pt; text-transform: uppercase; letter-spacing: .14em; color: #8fe7d6; font-weight: 600; margin-bottom: 1mm; }
+  .cover .meta span { color: #fff; }
+
+  /* headings */
+  h2.sec { margin-top: 0; break-before: page; break-after: avoid; font-size: 22pt; margin: 0 0 3mm; color: var(--teal-d); display: flex; align-items: center; gap: 4mm; letter-spacing: -.01em; }
+  h2.sec .n { display: inline-flex; align-items: center; justify-content: center; width: 11mm; height: 11mm; border-radius: 3mm; background: var(--teal); color: #fff; font-size: 13pt; font-weight: 700; flex: none; }
+  .lead { font-size: 11.5pt; color: var(--muted); margin: 0 0 6mm; }
+  h2.sec.nobreak { break-before: auto; }
+  h3 { break-after: avoid; font-size: 13pt; margin: 6mm 0 2mm; color: var(--teal-d); }
+  h4 { break-after: avoid; font-size: 10.5pt; margin: 4mm 0 1mm; color: var(--teal); text-transform: uppercase; letter-spacing: .08em; }
+  p { margin: 0 0 3mm; }
+  ul, ol { margin: 0 0 3mm; padding-left: 5.5mm; }
+  li { margin: 0 0 1.2mm; }
+  a { color: var(--teal); text-decoration: none; }
+  code { font-family: "Cascadia Mono", Consolas, "Courier New", monospace; background: #eef3f2; padding: .3mm 1.3mm; border-radius: 1mm; font-size: 9pt; }
+  pre { background: #0d2429; color: #d6f5ef; padding: 4mm 5mm; border-radius: 3mm; font-family: "Cascadia Mono", Consolas, "Courier New", monospace; font-size: 8.6pt; line-height: 1.55; white-space: pre-wrap; margin: 0 0 4mm; }
+  pre .c { color: #7fb0a8; }
+  table { width: 100%; border-collapse: collapse; margin: 0 0 4mm; font-size: 9.4pt; }
+  th { text-align: left; background: var(--teal-d); color: #fff; padding: 2mm 3mm; font-weight: 600; }
+  th:first-child { border-top-left-radius: 2mm; } th:last-child { border-top-right-radius: 2mm; }
+  tr { break-inside: avoid; }
+  td { padding: 1.6mm 3mm; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:nth-child(even) td { background: #f6faf9; }
+  .box { border-radius: 3mm; padding: 3.5mm 4.5mm; margin: 0 0 4mm; border-left: 1.6mm solid; font-size: 9.8pt; }
+  .box b.t { display: block; font-size: 8.4pt; text-transform: uppercase; letter-spacing: .12em; margin-bottom: .8mm; }
+  .tip { background: var(--teal-l); border-color: var(--teal); } .tip b.t { color: var(--teal); }
+  .note { background: var(--amber-l); border-color: var(--amber); } .note b.t { color: var(--amber); }
+  .warn { background: var(--red-l); border-color: var(--red); } .warn b.t { color: var(--red); }
+  .ok { background: var(--green-l); border-color: var(--green); } .ok b.t { color: var(--green); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3.5mm; }
+  .card { border: 1px solid var(--line); border-radius: 3mm; padding: 3.5mm 4mm; background: #fff; }
+  .card b { color: var(--teal-d); display: block; margin-bottom: 1mm; }
+  .card.big b { font-size: 20pt; line-height: 1; color: var(--teal); margin-bottom: 1.5mm; }
+  .card small { color: var(--muted); font-size: 8.6pt; }
+  .steps { counter-reset: s; list-style: none; padding: 0; margin: 0 0 4mm; }
+  .steps li { counter-increment: s; position: relative; padding: 0 0 0 11mm; margin: 0 0 3mm; min-height: 8mm; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 7.5mm; height: 7.5mm; border-radius: 50%; background: var(--teal); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 9.5pt; }
+  figure { margin: 0 0 4mm; break-inside: avoid; }
+  figure img { max-width: 100%; max-height: 88mm; width: auto; margin: 0 auto; border: 1px solid var(--line); border-radius: 2.5mm; display: block; }
+  figcaption { font-size: 8.6pt; color: var(--muted); margin-top: 1.5mm; }
+  .phones { display: flex; gap: 6mm; justify-content: center; align-items: flex-start; margin: 0 0 4mm; }
+  .phone { width: 46mm; border: 2.2mm solid #14272b; border-radius: 8mm; overflow: hidden; background: #fff; box-shadow: 0 2mm 6mm rgba(0,0,0,.12); }
+  .phone img { width: 100%; display: block; border: 0; border-radius: 0; }
+  .phones figcaption { text-align: center; }
+  .toc { list-style: none; padding: 0; margin: 0; columns: 2; column-gap: 12mm; }
+  .toc li { display: flex; gap: 3mm; border-bottom: 1px dotted #b8c9c7; padding: 1.6mm 0; margin: 0; break-inside: avoid; }
+  .toc li b { color: var(--teal); width: 6mm; flex: none; }
+  .chip { display: inline-block; background: var(--teal-l); color: var(--teal-d); border-radius: 10mm; padding: .3mm 2.4mm; font-size: 8.6pt; font-weight: 600; }
+  .scan { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; margin: 0 0 4mm; }
+  .scan .s { border: 1px solid var(--line); border-radius: 3mm; padding: 3mm; text-align: center; background: #fff; }
+  .scan svg { width: 24mm; height: 24mm; }
+  .scan b { display: block; color: var(--teal-d); }
+  .scan small { color: var(--muted); }
+  .flow { display: flex; align-items: stretch; gap: 2mm; margin: 0 0 4mm; font-size: 8.6pt; }
+  .flow div { flex: 1; background: var(--teal-l); border: 1px solid #bfdcd8; border-radius: 2.5mm; padding: 2mm 2.2mm; text-align: center; position: relative; }
+  .flow div b { display: block; color: var(--teal-d); }
+  .flow div.rule { background: var(--teal-d); color: #fff; } .flow div.rule b { color: #8fe7d6; }
+  .flow div.end { background: var(--green-l); border-color: #b9e0cb; }
+  .small { font-size: 8.8pt; color: var(--muted); }
+  .band { background: linear-gradient(90deg, var(--teal-d), var(--teal)); color: #fff; border-radius: 4mm; padding: 5mm 6mm; margin: 0 0 5mm; }
+  .band h3 { color: #fff; margin: 0 0 1mm; } .band p { margin: 0; color: #d3eeea; }
+  .avoid { break-inside: avoid; }
+  .back { background: linear-gradient(155deg, #072f36 0%, #0a3d46 55%, #0f6b6b 100%); color: #fff; height: 297mm; padding: 0; }
+  .back .inner { padding: 30mm 22mm; height: 100%; display: flex; flex-direction: column; justify-content: center; }
+  .back img { mix-blend-mode: lighten; }
+  .back h2 { font-size: 26pt; margin: 0 0 4mm; } .back p { color: #cfe9e6; max-width: 130mm; }
+  .back pre { background: rgba(255,255,255,.08); color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<section class="page cover">
+  <div class="glow"></div><div class="glow2"></div>
+  <div class="inner">
+    <img class="logo" src="../branding/logo-horizontal-dark.svg" alt="PayShield.lk">
+    <div class="kicker">User Manual · Version 0.1.0</div>
+    <h1>Stop the SIM-swap<br>before the money moves.</h1>
+    <p class="sub">How to install, run, use and test PayShield.lk, the pilot fraud desk that holds a suspicious payment until the real customer answers on their own phone.</p>
+    <div class="meta">
+      <div><b>Team</b><span>Spikers</span></div>
+      <div><b>University</b><span>University of Ruhuna</span></div>
+      <div><b>Built</b><span>16 November – 29 November 2026</span></div>
+      <div><b>Demonstration bank</b><span>BankCylone (fictional)</span></div>
+      <div style="grid-column: 1 / -1"><b>Source code</b><span>github.com/AKMaasif/paysheildlk-university</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TEAM + CONTENTS ============ -->
+<section class="page">
+  <h2 class="sec nobreak"><span class="n">★</span>The team</h2>
+  <p class="lead">PayShield.lk was designed, built and tested by Team Spikers from the University of Ruhuna between 16 and 29 November 2026.</p>
+  <table>
+    <tr><th style="width:34%">Name</th><th style="width:22%">Role</th><th>Contact</th></tr>
+    <tr><td><b>Mohammed Aasif</b></td><td>Team Lead</td><td>maasif6379@gmail.com</td></tr>
+    <tr><td>Abdhul Samidhu Mohamed Saheer</td><td>Member</td><td>mohamedshaheer637@gmail.com</td></tr>
+    <tr><td>Rafiudeen Shaith Ahamed</td><td>Member</td><td>shaith1208@gmail.com</td></tr>
+    <tr><td>Tharukshan Ganeshalingm</td><td>Member</td><td>gtharukshan@gmail.com</td></tr>
+  </table>
+  <div class="box tip"><b class="t">How the work was done</b>The team set the requirements, made the design decisions, reviewed the code and ran every test. AI coding assistance was used in a supporting role: to help shape the architecture, to help design the frontend, and to help with the testing work.</div>
+
+  <h2 class="sec nobreak" style="margin-top:9mm"><span class="n">≡</span>Contents</h2>
+  <ol class="toc" style="list-style:none">
+    <li><b>1</b>About PayShield.lk</li>
+    <li><b>2</b>How a payment is protected</li>
+    <li><b>3</b>What you need</li>
+    <li><b>4</b>Install and first start</li>
+    <li><b>5</b>Customer guide (phone)</li>
+    <li><b>6</b>Fraud desk guide (console)</li>
+    <li><b>7</b>Demo controls and scenarios</li>
+    <li><b>8</b>Share the demo on the internet</li>
+    <li><b>9</b>Real SMS and email</li>
+    <li><b>10</b>Models and fallbacks</li>
+    <li><b>11</b>Security and privacy</li>
+    <li><b>12</b>Testing and quality</li>
+    <li><b>13</b>Troubleshooting</li>
+    <li><b>14</b>Technology and limits</li>
+    <li><b>15</b>Glossary and quick reference</li>
+  </ol>
+</section>
+
+<!-- ============ 1 ABOUT ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">1</span>About PayShield.lk</h2>
+  <p class="lead">A SIM swap is the moment a fraudster gets a SIM card in a victim's name. Bank codes and alerts then go to the fraudster, and a payment looks like it came from the customer's own trusted phone.</p>
+  <div class="band"><h3>The idea</h3><p>Banks see the payment. Telecom operators see the SIM change. PayShield.lk reads <b>both at the same time</b>, holds the money, and asks the real customer on the phone and account they registered, not on the SIM a fraudster controls.</p></div>
+
+  <div class="grid3 avoid">
+    <div class="card"><b>Two feeds, one view</b>A telecom agent reads SIM, handset, location and port-out signals. A banking agent reads payments and compares them with what is usual for that customer.</div>
+    <div class="card"><b>Rules decide</b>A fixed rule layer holds, blocks or releases. A language model only writes the analyst's note. It never moves money.</div>
+    <div class="card"><b>The customer proves it</b>A live face scan (straight, left, right) and security questions confirm it is the real person before a held payment is released.</div>
+  </div>
+
+  <h3>Who uses it</h3>
+  <table>
+    <tr><th style="width:28%">Person</th><th>What they do</th></tr>
+    <tr><td><b>Customer</b></td><td>Registers once on their phone, answers "Did you make this payment?", completes the face scan and security questions when asked, and receives a receipt.</td></tr>
+    <tr><td><b>Fraud analyst</b></td><td>Watches cases live, reviews held payments, reads incident reports and tunes the hold threshold.</td></tr>
+    <tr><td><b>Bank supervisor</b></td><td>Decides held payments that the rules cannot settle and handles escalated cases.</td></tr>
+    <tr><td><b>Telecom operator</b></td><td>Views SIM events and the feed that PayShield.lk uses.</td></tr>
+    <tr><td><b>Auditor</b></td><td>Read-only view of cases, reports and the audit log. Cannot run drills.</td></tr>
+    <tr><td><b>Administrator</b></td><td>Manages users and settings.</td></tr>
+  </table>
+
+  <div class="box note"><b class="t">Please read</b>This is a pilot built for study. Every person, balance and payment is fictional, and the telecom and bank feeds are simulated. Do not enter real personal or banking details.</div>
+
+</div>
+</section>
+
+<!-- ============ 2 HOW ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">2</span>How a payment is protected</h2>
+  <p class="lead">Every payment follows the same path. The rule layer makes the decision; the agents gather the evidence and keep the record.</p>
+  <div class="flow">
+    <div><b>1 Case opens</b>Supervisor</div>
+    <div><b>2 Read feeds</b>Telecom + Banking</div>
+    <div><b>3 Score</b>Risk agent</div>
+    <div class="rule"><b>4 Decide</b>Policy rules (no model)</div>
+    <div><b>5 Ask</b>Alert agent</div>
+    <div class="end"><b>6 Record</b>Report agent</div>
+  </div>
+  <table>
+    <tr><th style="width:15%">Decision</th><th>When</th><th style="width:30%">What happens next</th></tr>
+    <tr><td><span class="chip" style="background:#fbeaea;color:#8a2b2b">Block</span></td><td>Open port-out, password reset within 6 hours, new payee and Rs. 500,000 or more.</td><td>Blocked at once. SIM freeze requested, account limited.</td></tr>
+    <tr><td><span class="chip" style="background:#fdf3df;color:#8a5a0f">Hold</span></td><td>Risk score of 45 or more, <i>or</i> a SIM swap in the last 72 hours with Rs. 50,000 or more and another warning sign.</td><td>The customer is asked on the registered phone.</td></tr>
+    <tr><td><span class="chip" style="background:#e7f5ee;color:#1f7a4d">Release</span></td><td>Everything else.</td><td>Released by the rules and recorded.</td></tr>
+  </table>
+  <h3>When a payment is held</h3>
+  <ol class="steps">
+    <li><b>The customer is asked.</b> "Did you make this payment?" appears in the app. The SMS and email are generic and carry no link and no code.</li>
+    <li><b>"No, this was not me."</b> The payment is blocked, a SIM freeze is requested and the account is limited.</li>
+    <li><b>"Yes, this was me."</b> The customer does the face scan, then answers rounds of security questions.</li>
+    <li><b>A pass</b> re-checks the signals one last time, then releases the money. <b>A fake face, or failed answers,</b> block the payment.</li>
+    <li><b>No answer.</b> After 3 minutes the customer is reminded. After 10 minutes a human analyst takes over and the money stays held.</li>
+  </ol>
+  <div class="box tip"><b class="t">Safe by design</b>If an agent crashes or both AI models are down, the rules still decide and the payment stays held rather than being released.</div>
+  <figure><img src="images/console-live-waiting.png" alt="Live agent activity for a case waiting on the customer"><figcaption>Live activity: a held payment waiting for the customer's yes or no. Steps that did not run on this case are dashed.</figcaption></figure>
+</section>
+
+<!-- ============ 3 NEEDS ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">3</span>What you need</h2>
+  <p class="lead">Everything runs in Docker, so the same steps work on Windows, macOS and Linux.</p>
+  <table>
+    <tr><th style="width:30%">Item</th><th>Details</th></tr>
+    <tr><td><b>Computer</b></td><td>About 4 GB of free memory and 4 GB of disk. A webcam if you want to try the face scan on the same computer.</td></tr>
+    <tr><td><b>Docker Desktop</b></td><td>Installed and running (the whale icon says <i>Engine running</i>). Docker Compose is included.</td></tr>
+    <tr><td><b>Git</b></td><td>To download the project.</td></tr>
+    <tr><td><b>Browser</b></td><td>A current Chrome, Edge or Safari. The camera only works on <code>localhost</code> or an <code>https</code> address.</td></tr>
+    <tr><td><b>Authenticator app</b></td><td>Google Authenticator, Microsoft Authenticator or similar, on your phone, with the phone's clock set automatically.</td></tr>
+    <tr><td><b>Optional keys</b></td><td>A Meta or Grok (xAI) key for AI-written notes. A Text.lk key and SMTP details for real SMS and email. Without keys the app still works.</td></tr>
+  </table>
+  <h3>The four containers</h3>
+  <div class="grid4">
+    <div class="card"><b>Website</b><small>Next.js. Fraud desk console and the phone-first customer site, port 3000.</small></div>
+    <div class="card"><b>Backend</b><small>FastAPI and the agent graph, port 8000.</small></div>
+    <div class="card"><b>Postgres 16</b><small>Cases, customers, ledger, audit log and agent checkpoints.</small></div>
+    <div class="card"><b>Redis 7</b><small>Rate limits and short-lived state.</small></div>
+  </div>
+  <div class="box tip"><b class="t">No keys? No problem</b>With no model key set, the agents use a built-in rules writer for their notes. The decisions are the same, because the rule layer, not the model, decides.</div>
+</section>
+
+<!-- ============ 4 INSTALL ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">4</span>Install and first start</h2>
+  <p class="lead">From an empty folder to a running fraud desk in about ten minutes.</p>
+  <h3>Download and start</h3>
+<pre><span class="c"># 1. Download the project</span>
+git clone https://github.com/AKMaasif/paysheildlk-university.git
+cd paysheildlk-university/university-project
+
+<span class="c"># 2. Create your settings file (Windows PowerShell: copy .env.example .env), then set JWT_SECRET, HMAC_KEY and ENCRYPTION_KEY (32+ characters) before real use</span>
+cp .env.example .env
+
+<span class="c"># 3. Build and start everything (console and customer site at http://localhost:3000)</span>
+docker compose up --build</pre>
+
+  <h3>Set the three secrets</h3>
+  <p>Open <code>.env</code> in a text editor and give each of these a long random value (at least 32 characters). Never share them or commit the file.</p>
+  <table>
+    <tr><th style="width:24%">Setting</th><th>Used for</th></tr>
+    <tr><td><code>JWT_SECRET</code></td><td>Signing sign-in tokens.</td></tr>
+    <tr><td><code>HMAC_KEY</code></td><td>Signing the handoffs between agents.</td></tr>
+    <tr><td><code>ENCRYPTION_KEY</code></td><td>Encrypting authenticator secrets, face data and customer details. If you lose it, stored data cannot be read. If you change it, start with a fresh database (<code>docker compose down -v</code>).</td></tr>
+  </table>
+
+  <h3>Check that it works</h3>
+  <ol class="steps">
+    <li>Open <b>http://localhost:8000/api/health</b>. You should see <code>"ok": true</code>, the database as <code>postgres</code> and Redis as <code>connected</code>.</li>
+    <li>Open <b>http://localhost:3000</b> and sign in to the console: <code>analyst@payshield.lk</code> / <code>pilot-analyst</code>.</li>
+    <li>Open <b>http://localhost:3000/c</b> for the customer site.</li>
+    <li>API documentation is at <b>http://localhost:8000/docs</b>.</li>
+  </ol>
+  <div class="box warn"><b class="t">Demo passwords</b>The console accounts and passwords above are for the pilot demonstration only. Change them before anything is shown outside the team.</div>
+</section>
+
+<!-- ============ 5 CUSTOMER ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">5</span>Customer guide (phone)</h2>
+  <p class="lead">The customer site is built for phones. Open it at <code>/c</code> on your site address.</p>
+  <div class="phones">
+    <figure><div class="phone"><img src="images/customer/15-phone-landing.png" alt="Customer landing page on a phone"></div><figcaption>Landing page</figcaption></figure>
+    <figure><div class="phone"><img src="images/customer/16-phone-register.png" alt="Registration on a phone"></div><figcaption>Step 1: your details</figcaption></figure>
+  </div>
+  <h3>5.1 Register (once)</h3>
+  <p>Registration proves you are the person on the bank's record. It has four steps.</p>
+  <ol class="steps">
+    <li><b>Your details.</b> Full name, email, NIC, mobile number and bank account number, exactly as they appear in the bank's records. Anything that does not match is refused.</li>
+    <li><b>Password.</b> Choose a username and a strong password.</li>
+    <li><b>Face scan.</b> Allow the camera, then follow the on-screen arrows (see 5.2).</li>
+    <li><b>Authenticator.</b> Scan the QR code with an authenticator app and type the 6-digit code it shows.</li>
+  </ol>
+  <div class="box tip"><b class="t">Demo customers</b>In the console, <b>Demo controls</b> shows each demo customer's registration details, their security answers and the authenticator QR code, so you can register them quickly.</div>
+  <figure><img src="images/customer/06-register-mismatch-error.png" alt="Registration refused because the details do not match"><figcaption>If a detail does not match the bank's record, registration is refused and you can correct it.</figcaption></figure>
+</section>
+
+<section class="page">
+  <h3 style="margin-top:0">5.2 The face scan: straight, left, right</h3>
+  <p>The face scan is the same simple three-step scan every time, at registration and again when you confirm a held payment.</p>
+  <div class="scan">
+    <div class="s"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#e6f1f0" stroke="#0f6b6b" stroke-width="2"/><circle cx="32" cy="28" r="9" fill="#0f6b6b"/><path d="M16 52c2-10 10-14 16-14s14 4 16 14" fill="#0f6b6b"/></svg><b>1 · Look straight</b><small>Hold still for a moment after the 3-second countdown.</small></div>
+    <div class="s"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#e6f1f0" stroke="#0f6b6b" stroke-width="2"/><path d="M26 14 12 32l14 18" fill="none" stroke="#0f6b6b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="38" cy="29" r="8" fill="#0f6b6b"/></svg><b>2 · Turn to your left</b><small>Slowly. An arrow on the picture shows the way. Then come back to the middle.</small></div>
+    <div class="s"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#e6f1f0" stroke="#0f6b6b" stroke-width="2"/><path d="M38 14l14 18-14 18" fill="none" stroke="#0f6b6b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="26" cy="29" r="8" fill="#0f6b6b"/></svg><b>3 · Turn to your right</b><small>Slowly, then back to the middle.</small></div>
+  </div>
+  <div class="grid2">
+    <div class="box tip"><b class="t">For a good scan</b><ul style="margin:0"><li>Use good, even light on your face.</li><li>Keep your whole face in the oval.</li><li>Keep your eyes open and move only as far as is comfortable.</li><li>Do not use a photo or a screen. A still image fails the check.</li></ul></div>
+    <div class="box note"><b class="t">If a scan is not accepted</b>You are told what to improve and can try again. Poor light or framing does not count against you. A different face or a fake twice blocks the payment.</div>
+  </div>
+
+  <h3>5.3 Sign in</h3>
+  <p>Sign in with your username and password, then the 6-digit code from your authenticator app. The password alone never opens a session. Signing out ends the session straight away.</p>
+  <figure><img src="images/customer/18-login-code.png" alt="Sign in with the authenticator code"><figcaption>Sign-in asks for the 6-digit code after the password.</figcaption></figure>
+  <h3>5.4 Your account</h3>
+  <p>Your home screen shows your balance, account details and recent transactions. If a payment needs you, a highlighted card appears at the top with the question.</p>
+  <figure><img src="images/customer/07-home-account.png" alt="Account home screen"><figcaption>The account home screen.</figcaption></figure>
+</section>
+
+<section class="page">
+  <h3 style="margin-top:0">5.5 When a payment needs you</h3>
+  <p>A card appears: <b>"Did you make this payment?"</b> with the amount and payee. The money stays held until you answer.</p>
+  <figure><img src="images/customer/08-home-payment-question.png" alt="The payment question"><figcaption>The question card. We will never text you a code. If someone calls and asks for one, hang up.</figcaption></figure>
+  <div class="grid2">
+    <div class="card"><b>No, this was not me</b>The payment is blocked, a SIM freeze is requested and your account is limited. You will then be asked to choose a new password.</div>
+    <div class="card"><b>Yes, this was me</b>Do the face scan (straight, left, right), then answer the security questions. A pass releases the payment.</div>
+  </div>
+  <h4>Security questions</h4>
+  <p>Each round asks three of your eight security questions, in a random order. You can have up to four rounds. We never say which answer was wrong.</p>
+  <figure><img src="images/customer/14-home-questions.png" alt="Security questions"><figcaption>Security questions after a successful face scan.</figcaption></figure>
+  <h3>5.6 After an alert</h3>
+  <ul>
+    <li><b>Receipt.</b> You get a receipt that lists each step and its time.</li>
+    <li><b>New password.</b> After any alert you must choose a new password before anything else.</li>
+    <li><b>Several payments.</b> If more than one payment is waiting, a notice tells you how many.</li>
+  </ul>
+  <figure><img src="images/customer/09-password-required.png" alt="Forced password change after an alert"><figcaption>A new password is required after an alert is settled.</figcaption></figure>
+</section>
+
+<!-- ============ 6 CONSOLE ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">6</span>Fraud desk guide (console)</h2>
+  <p class="lead">Sign in at <code>http://localhost:3000</code>. The menu on the left groups the pages into <b>Monitor</b>, <b>Respond</b> and <b>Assure</b>.</p>
+  <figure><img src="images/console-overview.png" alt="Sri Lanka overview"><figcaption>Overview: 30-day fraud analytics, payments per day and by province, and the key counts.</figcaption></figure>
+  <table>
+    <tr><th style="width:21%">Page</th><th>What it is for</th></tr>
+    <tr><td><b>Overview</b></td><td>The headline numbers, a plain-language fraud brief counted from the ledger by fixed code, and charts by day and province.</td></tr>
+    <tr><td><b>Live activity</b></td><td>A flow view of one case: every agent, tool call, handoff and model note as it happens.</td></tr>
+    <tr><td><b>Fraud analytics</b> and <b>Sri Lanka map</b></td><td>Abnormal payments by district, province and day, and a map of where they are.</td></tr>
+    <tr><td><b>SIM events</b></td><td>The telecom events (swaps, new handsets, port-outs) the system has received.</td></tr>
+    <tr><td><b>Cases</b> and <b>On hold</b></td><td>All cases with filters, and the held payments waiting for a decision.</td></tr>
+    <tr><td><b>Reports</b></td><td>The PDF incident report for each case.</td></tr>
+    <tr><td><b>Agents &amp; models</b></td><td>Which agent used which model, and when the fallback was used.</td></tr>
+    <tr><td><b>Simulate</b> and <b>Demo controls</b></td><td>Raise a SIM swap and a payment, or run a drill.</td></tr>
+    <tr><td><b>Calibration</b></td><td>Propose a change to the hold threshold. It takes effect only after an analyst approves it.</td></tr>
+    <tr><td><b>Add customer</b></td><td>Create a test customer who can then register on the phone site.</td></tr>
+    <tr><td><b>Security</b> and <b>Settings</b></td><td>Security status, the audit log and the system settings.</td></tr>
+  </table>
+</section>
+
+<section class="page">
+  <h3 style="margin-top:0">6.1 Live agent activity</h3>
+  <p>Pick a case at the top right. Each block is a step. Click a block to read the tool call or the model note. A dashed block did not run on this case, and the rule step never calls a model.</p>
+  <figure><img src="images/console-live-activity.png" alt="Live activity for a blocked case"><figcaption>A case that the rules blocked at once, with every step marked <i>Done</i>.</figcaption></figure>
+  <ul>
+    <li><b>Waiting banner.</b> While a case waits for the customer, the banner shows the countdown to the re-alert and to the escalation.</li>
+    <li><b>Live terminal.</b> Below the flow, a log lists every step. Filter it by tools, models or decisions.</li>
+    <li><b>Reset clears it.</b> Pressing <i>Reset demo state</i> in Demo controls also clears this page.</li>
+  </ul>
+  <h3>6.2 Cases, held payments and reports</h3>
+  <div class="grid2">
+    <figure><img src="images/console-cases.png" alt="Cases"><figcaption>Cases, with filters for bank, province and risk.</figcaption></figure>
+    <figure><img src="images/console-on-hold.png" alt="On hold"><figcaption>On hold: payments waiting for a person.</figcaption></figure>
+  </div>
+  <figure><img src="images/console-reports.png" alt="Reports"><figcaption>Reports: open a case's incident report as a PDF, with a timeline and charts.</figcaption></figure>
+</section>
+
+<section class="page">
+  <h3 style="margin-top:0">6.3 Analytics, map and SIM events</h3>
+  <div class="grid2">
+    <figure><img src="images/console-analytics.png" alt="Fraud analytics"><figcaption>Fraud analytics by district and province.</figcaption></figure>
+    <figure><img src="images/console-map.png" alt="Sri Lanka map"><figcaption>Sri Lanka map of abnormal payments.</figcaption></figure>
+  </div>
+  <figure><img src="images/console-sim-events.png" alt="SIM events"><figcaption>SIM events from the (simulated) operator feed.</figcaption></figure>
+  <h3>6.4 Agents, models and calibration</h3>
+  <div class="grid2">
+    <figure><img src="images/console-agents-models.png" alt="Agents and models"><figcaption>Agents &amp; models.</figcaption></figure>
+    <figure><img src="images/console-calibration.png" alt="Calibration"><figcaption>Calibration of the hold threshold.</figcaption></figure>
+  </div>
+  <div class="box note"><b class="t">Calibration needs a human</b>An analyst can propose a new hold threshold, between 35 and 70 (the default is 45). Nothing changes until an analyst approves the proposal.</div>
+  <h3>6.5 Roles</h3>
+  <p>The five console roles are fraud analyst, telecom operator, bank supervisor, auditor and administrator (see section 1). In the demo their sign-ins are <code>analyst@</code>, <code>telco@</code>, <code>supervisor@</code>, <code>auditor@</code> and <code>admin@payshield.lk</code>; the passwords are in the project README and should be changed before any wider use. The auditor is read only and cannot run a drill.</p>
+</section>
+
+<!-- ============ 7 DEMO ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">7</span>Demo controls and scenarios</h2>
+  <p class="lead">Use <b>Demo controls</b> to show the whole flow without waiting for real fraud.</p>
+  <figure><img src="images/console-demo-controls.png" alt="Demo controls"><figcaption>Demo controls: pick a customer and a scenario, then press <i>Trigger case</i>.</figcaption></figure>
+  <table>
+    <tr><th style="width:36%">Scenario</th><th>Expected result</th></tr>
+    <tr><td><b>SIM swap and Rs. 200,000 to a new payee</b></td><td>Hold. The customer answers. A pass releases it, "no" blocks it.</td></tr>
+    <tr><td><b>Port-out, password reset and Rs. 800,000</b></td><td>Blocked at once, without waiting for the customer.</td></tr>
+    <tr><td><b>Rs. 75,000 payment with no SIM signal</b></td><td>Released by the normal rules. Switch on emergency mode for the district and the same payment is held.</td></tr>
+    <tr><td><b>Routine bill of Rs. 4,850</b></td><td>Released by the rules.</td></tr>
+  </table>
+  <h3>A complete walk-through (about 5 minutes)</h3>
+  <ol class="steps">
+    <li>On <b>Demo controls</b>, pick <b>Nimal Perera</b>. If the status says <i>Not registered yet</i>, register Nimal on the phone site using the details shown on the page.</li>
+    <li>Press <b>Reset demo state</b>, choose <i>SIM swap and Rs. 200,000</i>, then press <b>Trigger case</b>.</li>
+    <li>Press <b>Watch it live</b> to follow the agents on <b>Live activity</b>.</li>
+    <li>On the phone site, sign in as Nimal. The question card appears. Press <b>Yes, this was me</b>.</li>
+    <li>Do the face scan (straight, left, right), then answer the security questions using the answers shown on Demo controls.</li>
+    <li>Watch the payment release and the report appear on <b>Reports</b>.</li>
+    <li>Press <b>Reset demo state</b> to remove the demo cases. The sample history stays, and any released demo payment is credited back to the account.</li>
+  </ol>
+  <div class="box tip"><b class="t">Timers</b>The re-alert (3 minutes) and the escalation (10 minutes) run on their own. The two buttons <i>Run the 3-minute re-alert now</i> and <i>Run the 10-minute escalation now</i> call the same handlers so a room does not have to wait.</div>
+  <h3>Drills (Simulate page)</h3>
+  <p>The Simulate page runs emergencies against the real agents: both models down, SMS and email failing, a fraud spike in a district, an agent crash, a silent customer and a manual block switch. In each case the rules still decide and a held payment stays held.</p>
+  <figure><img src="images/console-simulate.png" alt="Simulate page"><figcaption>Simulate: each drill drives the real agents.</figcaption></figure>
+</section>
+
+<!-- ============ 8 SHARE ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">8</span>Share the demo on the internet</h2>
+  <p class="lead">To let people try the customer site on their own phones, publish your computer's site through a tunnel. Everything still runs on your computer.</p>
+  <div class="box note"><b class="t">The link only works while your computer is on</b>The server is your own computer. The link works only while the computer, Docker and the tunnel are running. A quick tunnel gives a new address each time it starts, so an old link stops working. (A named Cloudflare tunnel on a domain you own keeps one address, but the computer still has to be on.)</div>
+  <h3>Each time</h3>
+  <ol class="steps">
+    <li>Open Docker Desktop and wait for <i>Engine running</i>.</li>
+    <li>In <code>.env</code> make sure <code>COOKIE_SECURE=true</code> and <code>DEMO_MODE=hybrid</code> are set.</li>
+    <li>Start the app and the front door:</li>
+  </ol>
+<pre>cd paysheildlk-university/university-project
+docker compose --profile share up --build -d</pre>
+  <ol class="steps" style="counter-reset: s 3">
+    <li>Check <b>http://localhost:8080</b> opens the site on your computer.</li>
+    <li>In a second window, start the tunnel (install it once with <code>winget install --id Cloudflare.cloudflared</code>):</li>
+  </ol>
+<pre>cloudflared tunnel --url http://localhost:8080</pre>
+  <ol class="steps" style="counter-reset: s 5">
+    <li>Wait for <i>Registered tunnel connection</i>. The address in the box (an <code>https://…trycloudflare.com</code> link) is your link.</li>
+    <li>Share <b>that address followed by /c</b>. Test it on a phone using mobile data before anyone else uses it.</li>
+  </ol>
+  <h3>Rules for a safe demo</h3>
+  <ul>
+    <li><b>Share only <code>/c</code>.</b> The fraud desk console is on the same address, so keep its login private.</li>
+    <li><b>Volunteers.</b> In the console, use <b>Add customer</b> with made-up NIC and account numbers. The volunteer then registers on the phone site with exactly those details.</li>
+    <li><b>Consent.</b> Tell volunteers that their face scan is stored, encrypted, on your computer.</li>
+    <li><b>Shared database.</b> Everyone shares one demo database. Press <b>Reset demo state</b> between people.</li>
+    <li><b>Keep the computer awake</b> and turn off sleep. When you finish, press Ctrl+C in the tunnel window and run <code>docker compose --profile share down</code>.</li>
+  </ul>
+</section>
+
+<!-- ============ 9 SMS EMAIL ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">9</span>Real SMS and email</h2>
+  <p class="lead">The alert reaches the customer by in-app message, SMS and email. By default, SMS and email are written to the log only. Turn on the real drivers when you are ready.</p>
+  <table>
+    <tr><th style="width:24%">Channel</th><th>Setting in <code>.env</code></th><th>Notes</th></tr>
+    <tr><td><b>SMS (Text.lk)</b></td><td><code>TEXTLK_API_KEY</code> and the sender settings</td><td>Your Text.lk account needs credit. Delivery is not instant.</td></tr>
+    <tr><td><b>Email (SMTP)</b></td><td><code>SMTP_HOST</code>, <code>SMTP_PORT</code>, user, password and sender</td><td>Any SMTP provider works.</td></tr>
+    <tr><td><b>Recipient safety</b></td><td><code>DEMO_ALLOWED_PHONES</code> and <code>DEMO_ALLOWED_EMAILS</code></td><td>In demo mode, real messages go <b>only</b> to numbers and addresses on these lists.</td></tr>
+  </table>
+  <h3>Setting it up</h3>
+  <ol class="steps">
+    <li>Fill in the key or SMTP settings in <code>.env</code>.</li>
+    <li>Add the test recipients to <code>DEMO_ALLOWED_PHONES</code> (international format, for example <code>+947…</code>) and <code>DEMO_ALLOWED_EMAILS</code>.</li>
+    <li>Restart the backend: <code>docker compose up -d</code>.</li>
+    <li>In the console, use <b>Add customer</b> to create a test customer with the recipient's own phone and email. Register that customer on the phone site.</li>
+    <li>Trigger a case for that customer. The SMS and email arrive on the registered number and address.</li>
+  </ol>
+  <h4>What the messages say</h4>
+  <p>The alert is generic: it asks whether you made a payment and points you to the app. It never contains a link or a code. A message with a link or a code is refused by the system itself, and a per-hour sending budget applies.</p>
+  <div class="box warn"><b class="t">Only message people who agreed</b>Add only your own numbers and addresses, or those of people who have agreed to receive test messages. Anyone not on the allow-list receives nothing.</div>
+  <div class="box note"><b class="t">Receipts</b>No delivery-receipt callback from the providers is integrated, so the system records "sent" or "failed" but never claims a message was "delivered".</div>
+</section>
+
+<!-- ============ 10 MODELS ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">10</span>Models and fallbacks</h2>
+  <p class="lead">Language models write the short analyst notes. They never choose to hold, block or release.</p>
+  <div class="flow">
+    <div><b>1 · Meta</b>Main model</div>
+    <div><b>2 · Grok (xAI)</b>Fallback</div>
+    <div class="end"><b>3 · Rules writer</b>Always available</div>
+  </div>
+  <table>
+    <tr><th style="width:26%">Setting</th><th>Meaning</th></tr>
+    <tr><td><code>META_API_KEY</code></td><td>Turns on the main model (<code>META_MODEL</code>, default <code>muse-ember-1.0</code>).</td></tr>
+    <tr><td><code>XAI_API_KEY</code></td><td>Turns on the fallback model (<code>XAI_MODEL</code>, default <code>grok-4.20-0309-non-reasoning</code>).</td></tr>
+    <tr><td>No key set</td><td>The built-in rules writer is used for every note.</td></tr>
+  </table>
+  <p>If the main model fails for any reason (rate limit, timeout or an error), the same request goes to the fallback. If both fail, the rules writer writes the note, so a case never waits on a model.</p>
+  <h4>Check which model was used</h4>
+  <ul>
+    <li><b>Health check:</b> <code>http://localhost:8000/api/health</code> lists the main model and the fallback and whether each key is configured.</li>
+    <li><b>Agents &amp; models</b> page and the live log show the model name on each note.</li>
+    <li>To test the fallback, set <code>META_API_KEY=</code> to empty and restart. Notes should then name the Grok model.</li>
+  </ul>
+  <div class="box tip"><b class="t">Privacy before models</b>Everything sent to a model is first masked. Raw phone numbers, NIC numbers, email addresses and account numbers never reach it, and it never sees security answers or face images.</div>
+  <figure><img src="images/console-agents-models.png" alt="Agents and models"><figcaption>Agents &amp; models: which model wrote which note, and any fallback.</figcaption></figure>
+</section>
+
+<!-- ============ 11 SECURITY ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">11</span>Security and privacy</h2>
+  <p class="lead">The pilot is built so that a mistake or a manipulated message cannot move money on its own.</p>
+  <table>
+    <tr><th style="width:24%">Control</th><th>How it works</th></tr>
+    <tr><td><b>Sign-in</b></td><td>Username and an Argon2id password hash, then a 6-digit authenticator code. A used code cannot be replayed. Lockouts and per-username and per-address limits apply.</td></tr>
+    <tr><td><b>Sessions</b></td><td>HttpOnly, SameSite=Strict cookies that page scripts cannot read. Signing out revokes the tokens, so an earlier copy stops working at once.</td></tr>
+    <tr><td><b>Encryption</b></td><td>Authenticator secrets and face data with AES-256-GCM. Email, phone, NIC and account number with AES-256-GCM-SIV so lookups still work. A wrong key stops the service at start. A key-rotation tool is included.</td></tr>
+    <tr><td><b>Agent handoffs</b></td><td>HMAC-SHA256 signature, a fresh nonce, an allowed-route table and an expiry. 120 of 120 hostile handoffs were rejected in testing.</td></tr>
+    <tr><td><b>Least privilege</b></td><td>Each agent has a written charter. A call outside it is refused (0 occurred in 2,816 benchmark calls).</td></tr>
+    <tr><td><b>Face scan</b></td><td>A signed, short-lived, one-use challenge. Head turns are measured from the frames, so a recording or still photo fails.</td></tr>
+    <tr><td><b>Messages</b></td><td>No link and no code. Allow-listed recipients in demo mode. A per-hour sending budget.</td></tr>
+    <tr><td><b>Audit</b></td><td>A hash-chained audit log. Security answers are stored as hashes, and the reply never says which answer was wrong.</td></tr>
+  </table>
+  <h3>What each agent may and may not do</h3>
+  <table>
+    <tr><th style="width:17%">Agent</th><th>Job</th><th style="width:34%">May not</th></tr>
+    <tr><td>Supervisor</td><td>Open the case and route it</td><td>Block, lock, release, report</td></tr>
+    <tr><td>Telecom</td><td>Read SIM, handset, location, port-out</td><td>Block, lock, release</td></tr>
+    <tr><td>Banking</td><td>Read activity and the customer profile</td><td>Block, lock, release</td></tr>
+    <tr><td>Risk</td><td>Score the signals</td><td>Hold, block, release, lock</td></tr>
+    <tr><td>Policy</td><td>Release, hold or block by rule (no model)</td><td>Lock account, report, SMS</td></tr>
+    <tr><td>Alert</td><td>Tell the customer</td><td>Block, release, lock</td></tr>
+    <tr><td>Verification</td><td>Face match, then questions</td><td>Block, lock, report</td></tr>
+    <tr><td>Response</td><td>The only agent that may block, freeze the SIM or lock</td><td>Release, report</td></tr>
+    <tr><td>Report and Analytics</td><td>Check notes, file the report and receipt; count payments and propose a threshold</td><td>Block, release, lock, or send messages</td></tr>
+  </table>
+</section>
+
+<!-- ============ 12 TESTING ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">12</span>Testing and quality</h2>
+  <p class="lead">Run the checks one at a time. Running them together makes the timing-sensitive tests unreliable.</p>
+<pre>cd backend &amp;&amp; python -m pytest -q
+cd backend &amp;&amp; python -m qa.scenario_matrix
+cd backend &amp;&amp; python -m evaluation.run
+cd frontend &amp;&amp; npx tsc --noEmit &amp;&amp; npm test
+cd e2e &amp;&amp; npm test</pre>
+  <table>
+    <tr><th style="width:30%">Check</th><th>What it covers</th></tr>
+    <tr><td><code>pytest</code></td><td>Unit, agent, integration and API tests, including the permission matrix for every endpoint.</td></tr>
+    <tr><td><code>qa.scenario_matrix</code></td><td>Twelve full scenario paths against their expectations. Writes <code>docs/SCENARIO_MATRIX.md</code>.</td></tr>
+    <tr><td><code>evaluation.run</code></td><td>The benchmark: 192 synthetic cases, each agent on its own, and a single-agent baseline.</td></tr>
+    <tr><td><code>tsc</code> and <code>npm test</code></td><td>Frontend type check and logic tests.</td></tr>
+    <tr><td><code>e2e</code></td><td>Browser tests (Playwright) on desktop, tablet and phone widths.</td></tr>
+    <tr><td><code>python -m qa.make_samples</code></td><td>Regenerates the sample inputs, outputs and PDF reports in <code>docs/samples</code>.</td></tr>
+  </table>
+  <h3>Results from the last full measurements</h3>
+  <div class="grid4">
+    <div class="card big"><b>1,791</b><small>backend tests passed, 0 failed (4 skipped)</small></div>
+    <div class="card big"><b>75/75</b><small>browser tests passed</small></div>
+    <div class="card big"><b>93.5%</b><small>line coverage</small></div>
+    <div class="card big"><b>58/58</b><small>deliberately broken rules were caught</small></div>
+  </div>
+  <table>
+    <tr><th style="width:42%">Benchmark (192 synthetic cases)</th><th>Result</th></tr>
+    <tr><td>Accuracy / recall</td><td>85.9% / 95.4%</td></tr>
+    <tr><td>Missed fraud on the patterns the rules were written for</td><td>0.0%</td></tr>
+    <tr><td>Missed fraud on red-team cases built to slip under thresholds</td><td>6.9%</td></tr>
+    <tr><td>False-hold rate (legitimate payments held, then released after the customer's check)</td><td>26.2%</td></tr>
+    <tr><td>Customer profile off versus on</td><td>Accuracy 65.6% → 85.9%; missed fraud 33.3% → 4.6%</td></tr>
+    <tr><td>Median / 95th percentile time to a decision</td><td>246 ms / 453 ms</td></tr>
+  </table>
+  <div class="grid2">
+    <figure><img src="../evaluation/flag-rate-by-scenario.png" alt="Flag rate by scenario"><figcaption>How often each scenario type is held or blocked.</figcaption></figure>
+    <figure><img src="../readme/coverage_by_agent.png" alt="Coverage by agent"><figcaption>Test coverage by agent.</figcaption></figure>
+  </div>
+  <p class="small">All data is synthetic. A 100% on a test usually means a guard against a written rule table. The results describe how this design behaves on invented cases, not what real fraud rates would be.</p>
+</section>
+
+<!-- ============ 13 TROUBLESHOOTING ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">13</span>Troubleshooting</h2>
+  <p class="lead">Most problems are one of a few causes. For anything else, collect the last 50 lines of the backend log.</p>
+<pre>docker compose logs backend --tail 50</pre>
+  <table>
+    <tr><th style="width:34%">Symptom</th><th>Likely cause and fix</th></tr>
+    <tr><td>Docker says it cannot connect to the engine</td><td>Docker Desktop is not running. Open it and wait for <i>Engine running</i>.</td></tr>
+    <tr><td>The backend stops at start-up with a key error</td><td>Your <code>ENCRYPTION_KEY</code> no longer matches the stored data. Restore the old key, or start fresh with <code>docker compose down -v</code>.</td></tr>
+    <tr><td>Demo controls shows an error instead of the registration details</td><td>Usually an old database with a new key (see above). Reset the volume.</td></tr>
+    <tr><td>Registration says the details do not match</td><td>One field differs from the bank's record. Copy each value exactly from <b>Demo controls</b>. Your own email or phone will not match a demo customer.</td></tr>
+    <tr><td>The camera will not start</td><td>The page is not on <code>localhost</code> or <code>https</code>, or camera access was blocked. Allow the camera in the browser.</td></tr>
+    <tr><td>The face scan is not accepted</td><td>Improve the light, keep your whole face in the oval, and turn a little further. Poor quality does not count against you.</td></tr>
+    <tr><td>The authenticator code is rejected</td><td>Your phone's clock is wrong. Set the time automatically. Use the code for the correct account entry.</td></tr>
+    <tr><td>After "Yes" there is no face scan, only questions</td><td>No usable face is on file for that account, so the scan is skipped and four rounds of questions decide. Register the customer again with the face scan to test the full flow.</td></tr>
+    <tr><td>The phone cannot sign in through the tunnel</td><td>Set <code>COOKIE_SECURE=true</code>, restart, then sign out and try again.</td></tr>
+    <tr><td>The shared link does not open</td><td>The tunnel window was closed, the computer slept, or Docker stopped. Start the tunnel again and share the new address.</td></tr>
+    <tr><td>Live activity looks empty</td><td>After a reset it shows "No demo case yet". Trigger a case, or use <b>Watch it live</b>.</td></tr>
+    <tr><td>The AI notes say "offline rules engine"</td><td>No model key is set. Add <code>META_API_KEY</code> or <code>XAI_API_KEY</code> and restart. The decisions are not affected.</td></tr>
+    <tr><td>A test fails when run together with another</td><td>Run the suites one at a time.</td></tr>
+  </table>
+</section>
+
+<!-- ============ 14 TECH ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">14</span>Technology and limits</h2>
+  <h3>Architecture</h3>
+  <div class="flow">
+    <div><b>Browser</b>Console + phone site</div>
+    <div><b>Next.js proxy</b>Same-origin <code>/backend</code></div>
+    <div class="rule"><b>FastAPI + LangGraph</b>Ten agents, rule layer</div>
+    <div><b>Postgres + Redis</b>Data, checkpoints, limits</div>
+  </div>
+  <table>
+    <tr><th style="width:24%">Layer</th><th>Technology</th></tr>
+    <tr><td>Orchestration</td><td>LangGraph supervisor graph. The case pauses at an <code>interrupt()</code> while the customer answers and resumes from a Postgres checkpoint.</td></tr>
+    <tr><td>Backend</td><td>FastAPI, SQLAlchemy, Alembic migrations, Argon2id, TOTP, HMAC-signed handoffs.</td></tr>
+    <tr><td>Face verification</td><td>dlib face embeddings with a signed one-use challenge.</td></tr>
+    <tr><td>Models</td><td>Meta, then Grok, then a built-in rules writer.</td></tr>
+    <tr><td>Frontend</td><td>Next.js 15, React 18, TypeScript, a phone-first customer site.</td></tr>
+    <tr><td>Delivery</td><td>Docker Compose, optional Caddy front door and Cloudflare tunnel for sharing.</td></tr>
+  </table>
+  <h3>Limits you should know about</h3>
+  <ul>
+    <li><b>Synthetic data.</b> Results come from invented customers and simulated feeds. They are not real fraud rates.</li>
+    <li><b>Simulated operator.</b> The telecom feed has the shape of the GSMA CAMARA SIM Swap API. Connecting a real operator means changing <code>TELCO_BASE_URL</code> and agreeing terms. A SIM freeze is recorded as a request; nothing is sent to an operator.</li>
+    <li><b>False holds.</b> About one in four legitimate payments in the benchmark is held and then released after the customer's check. The threshold can be tuned on the Calibration page.</li>
+    <li><b>Face matching</b> is demonstration grade. Light, camera and pose affect it, and it does not replace the security questions.</li>
+    <li><b>One shared demo database.</b> Use <i>Reset demo state</i> between audiences.</li>
+    <li><b>Not a certified product.</b> There has been no third-party penetration test and no regulator approval.</li>
+  </ul>
+  <h3>More documents</h3>
+  <p>The repository's <code>docs</code> folder has the architecture map, threat model, deployment guide, runbook, test plan and report, scenario matrix, evaluation results and the sample inputs, outputs and PDF reports.</p>
+</section>
+
+<!-- ============ 15 GLOSSARY ============ -->
+<section class="page">
+  <h2 class="sec"><span class="n">15</span>Glossary and quick reference</h2>
+  <table>
+    <tr><th style="width:24%">Term</th><th>Meaning</th></tr>
+    <tr><td>SIM swap</td><td>Moving a phone number to a new SIM card. A fraudster does this to receive the victim's messages and codes.</td></tr>
+    <tr><td>Port-out</td><td>Moving a number to another operator.</td></tr>
+    <tr><td>Hold</td><td>The money is kept back until the customer or an analyst decides.</td></tr>
+    <tr><td>Block</td><td>The payment is stopped and cannot be released afterwards.</td></tr>
+    <tr><td>Risk score</td><td>Warning signs added up to a number from 0 to 100. It is an input to the rules, not the decision.</td></tr>
+    <tr><td>Payee</td><td>The person or business receiving the money. A <i>new payee</i> was added recently.</td></tr>
+    <tr><td>Handoff</td><td>A signed message passed from one agent to the next.</td></tr>
+    <tr><td>CAMARA</td><td>An open standard for network APIs. The SIM Swap API is the shape the telecom feed copies.</td></tr>
+    <tr><td>NIC</td><td>National Identity Card number.</td></tr>
+    <tr><td>Hybrid mode</td><td>Real SMS, email and AI models may be used, but only for the allow-listed test recipients.</td></tr>
+  </table>
+  <h3>Quick reference</h3>
+  <div class="grid2">
+    <div class="card"><b>Addresses</b><small>Console: <code>localhost:3000</code><br>Customer site: <code>localhost:3000/c</code><br>API docs: <code>localhost:8000/docs</code><br>Health: <code>localhost:8000/api/health</code><br>Sharing front door: <code>localhost:8080</code></small></div>
+    <div class="card"><b>Commands</b><small><code>docker compose up --build</code> start<br><code>docker compose down</code> stop<br><code>docker compose down -v</code> clean start<br><code>docker compose logs backend --tail 50</code><br><code>docker compose --profile share up -d</code> share</small></div>
+  </div>
+  <h3>Frequently asked questions</h3>
+  <p><b>Does the AI decide whether my money is released?</b><br>No. A fixed rule layer decides. The models only write the analyst's note.</p>
+  <p><b>What if the models or the telecom feed are down?</b><br>The rules still decide, and a held payment stays held.</p>
+  <p><b>Can I try it with no internet?</b><br>Yes, on <code>localhost</code>. Only the optional AI models, SMS and email need the internet.</p>
+  <p><b>Is any real customer data used?</b><br>No. Every customer, balance and payment is fictional.</p>
+</section>
+
+<!-- ============ BACK ============ -->
+<section class="page back">
+  <div class="inner">
+    <img src="../branding/logo-horizontal-dark.svg" alt="PayShield.lk" style="width:70mm;margin-bottom:12mm">
+    <h2>Team Spikers · University of Ruhuna</h2>
+    <p>PayShield.lk was built between 16 and 29 November 2026. To download the project and run it:</p>
+<pre>git clone https://github.com/AKMaasif/paysheildlk-university.git
+cd paysheildlk-university/university-project
+cp .env.example .env
+docker compose up --build</pre>
+    <p style="margin-top:8mm;font-size:9.5pt">PayShield.lk is an independent pilot built for study. BankCylone is a fictional bank. No real customer data is used.</p>
+  </div>
+</section>
+
+</body>
+</html>
