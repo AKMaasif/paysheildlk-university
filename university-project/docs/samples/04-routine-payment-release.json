@@ -1,0 +1,352 @@
+{
+  "input": {
+    "customer": {
+      "id": "cus_nimal",
+      "name": "Nimal Perera",
+      "bank": "BankCylone",
+      "phone": "*********183"
+    },
+    "telecom_feed": [],
+    "bank_feed_before_the_payment": [],
+    "payment": {
+      "id": "TX-0BB766",
+      "amount_lkr": 4850,
+      "payee": "CEB Electricity",
+      "new_payee": false,
+      "status_when_it_arrived": "pending"
+    },
+    "customer_responses": []
+  },
+  "output": {
+    "case_id": "PS-26-00046",
+    "risk_score": 0,
+    "risk_factors": [],
+    "policy_decision": "release",
+    "policy_reason": "Rule: the signals do not meet the hold threshold. The transfer can proceed. A short case note is still filed.",
+    "case_status": "closed_cleared",
+    "payment_status": "released",
+    "notifications": [
+      {
+        "channel": "push",
+        "title": "Payment update"
+      },
+      {
+        "channel": "email",
+        "title": "Payment update"
+      },
+      {
+        "channel": "email",
+        "title": "Your PayShield receipt PS-26-00046"
+      },
+      {
+        "channel": "sms",
+        "title": "SMS"
+      },
+      {
+        "channel": "push",
+        "title": "Your receipt is ready"
+      }
+    ],
+    "timeline": [
+      {
+        "t_plus_s": 0.0,
+        "agent": "supervisor",
+        "message": "Opening the case and assigning the two feeds.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "supervisor",
+        "message": null,
+        "tool": "create_case"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "supervisor",
+        "message": null,
+        "tool": "create_case"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "supervisor",
+        "message": "Telecom and banking look at the same case in parallel. The route is fixed.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "supervisor",
+        "message": "Banking agent assigned.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "telecom",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": "Reading recent account activity.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "telecom",
+        "message": "Reading the SIM profile for this number.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": null,
+        "tool": "get_recent_transactions"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_sim_swap_status"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": null,
+        "tool": "get_recent_transactions"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": "Looking further: A payment is waiting, so compare it with what is usual for this customer.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_sim_swap_status"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": null,
+        "tool": "get_customer_profile"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_device_change"
+      },
+      {
+        "t_plus_s": 0.0,
+        "agent": "banking",
+        "message": null,
+        "tool": "get_customer_profile"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_device_change"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_location_events"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "banking",
+        "message": "The recent account activity is the list returned by the bank tool. Nothing in that list is being reclassified here.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_location_events"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_port_out_status"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": null,
+        "tool": "get_port_out_status"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "telecom",
+        "message": "The operator feed shows no SIM change inside the checked window. Handset and location, where present, do not add a recent swap.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "risk",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "risk",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "risk",
+        "message": "Adding the telecom and bank signals.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "risk",
+        "message": null,
+        "tool": "compute_risk_score"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "risk",
+        "message": null,
+        "tool": "compute_risk_score"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "risk",
+        "message": "The score is the sum of the factor table from the rule definitions, capped at 100. It is an input to the rule layer, which makes the hold, block, or release decision.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "policy",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "policy",
+        "message": "Applying the hold, block, and release rules. This step does not call a model.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "policy",
+        "message": null,
+        "tool": "compute_risk_score"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "policy",
+        "message": "Rule: the signals do not meet the hold threshold. The transfer can proceed. A short case note is still filed.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "policy",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "policy",
+        "message": "Rule layer released the transfer.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "policy",
+        "message": null,
+        "tool": "revalidate_before_release"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "policy",
+        "message": null,
+        "tool": "revalidate_before_release"
+      },
+      {
+        "t_plus_s": 0.1,
+        "agent": "policy",
+        "message": null,
+        "tool": "release_transaction"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "policy",
+        "message": null,
+        "tool": "release_transaction"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "case",
+        "message": null,
+        "tool": "verify_handoff"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "case",
+        "message": "Writing the incident report.",
+        "tool": null
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "case",
+        "message": null,
+        "tool": "review_notes"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "case",
+        "message": null,
+        "tool": "review_notes"
+      },
+      {
+        "t_plus_s": 0.2,
+        "agent": "case",
+        "message": null,
+        "tool": "generate_report"
+      },
+      {
+        "t_plus_s": 0.3,
+        "agent": "case",
+        "message": null,
+        "tool": "generate_report"
+      },
+      {
+        "t_plus_s": 0.3,
+        "agent": "case",
+        "message": null,
+        "tool": "deliver_report"
+      },
+      {
+        "t_plus_s": 0.3,
+        "agent": "case",
+        "message": null,
+        "tool": "deliver_report"
+      },
+      {
+        "t_plus_s": 0.3,
+        "agent": "case",
+        "message": "The incident report lists the feeds, the rule decision, the customer answer, and the actions. It is the record a fraud desk would keep.",
+        "tool": null
+      }
+    ],
+    "report": {
+      "title": "Incident report PS-26-00046",
+      "sha256_of_pdf": "09d724992ba7172d879e13572cab510e5a9d0de6ac143223963b81ca955aa6f7"
+    }
+  },
+  "scenario": "routine_payment"
+}
