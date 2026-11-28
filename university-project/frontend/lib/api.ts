@@ -129,7 +129,12 @@ export async function downloadAuthed(path: string, filename: string, portal: Por
 export function wsUrl(portal: Portal = "operator"): string {
   const explicit = process.env.NEXT_PUBLIC_WS_URL;
   if (explicit) return `${explicit}${explicit.includes("?") ? "&" : "?"}portal=${portal}`;
-  const proto = window.location.protocol === "https:" ? "wss" : "ws";
+  // Over https the site is reached through a proxy or a tunnel (see docs/SHARE_ONLINE.md). That one address also
+  // forwards /ws to the backend, so the stream uses the same host and no extra port.
+  if (window.location.protocol === "https:") {
+    const host = window.location.host || window.location.hostname;
+    return `wss://${host}/ws?portal=${portal}`;
+  }
   const port = process.env.NEXT_PUBLIC_WS_PORT || "8000";
-  return `${proto}://${window.location.hostname}:${port}/ws?portal=${portal}`;
+  return `ws://${window.location.hostname}:${port}/ws?portal=${portal}`;
 }
