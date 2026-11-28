@@ -334,8 +334,8 @@ providers and real cameras are done by hand, not by the suite.
 ## Run it
 
 ```bash
-git clone https://github.com/AKMaasif/sim-swap-shield.git
-cd sim-swap-shield/university-project
+git clone https://github.com/AKMaasif/paysheildlk-university.git
+cd paysheildlk-university/university-project
 cp .env.example .env        # set JWT_SECRET, HMAC_KEY and ENCRYPTION_KEY (32+ characters) before real use
 docker compose up --build   # console and customer site at http://localhost:3000
 ```

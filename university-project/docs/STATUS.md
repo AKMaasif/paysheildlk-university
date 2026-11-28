@@ -53,8 +53,8 @@ Real SMS (Text.lk key and your number), real email (SMTP and your address), web 
 ## Set up and run
 
 ```bash
-git clone https://github.com/AKMaasif/sim-swap-shield.git
-cd sim-swap-shield/university-project
+git clone https://github.com/AKMaasif/paysheildlk-university.git
+cd paysheildlk-university/university-project
 cp .env.example .env        # set ENCRYPTION_KEY to 32+ characters (openssl rand -hex 32) before real use
 docker compose up --build   # console and customer site at http://localhost:3000
 ```

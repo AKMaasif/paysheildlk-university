@@ -13,8 +13,8 @@ The people and money in the demo are fictional.
 ## 2. Get the code
 
 ```bash
-git clone https://github.com/AKMaasif/sim-swap-shield.git
-cd sim-swap-shield/university-project
+git clone https://github.com/AKMaasif/paysheildlk-university.git
+cd paysheildlk-university/university-project
 ```
 
 ## 3. Create your settings file
