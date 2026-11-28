@@ -25,6 +25,7 @@
 <p align="center">
   <a href="https://www.youtube.com/watch?v=X6d-3UrnCWA"><img src="https://img.youtube.com/vi/X6d-3UrnCWA/hqdefault.jpg" alt="Watch the PayShield.lk demo video on YouTube" width="480"></a>
   <br><b><a href="https://www.youtube.com/watch?v=X6d-3UrnCWA">&#9654; Watch the demo video on YouTube</a></b>
+  <br><sub>The video file is also in this repository: <a href="Project-Demo.mp4">Project-Demo.mp4</a> (open it to play, or download it)</sub>
 </p>
 
 > [!IMPORTANT]
